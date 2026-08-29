@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test backend helpers
+        run: |
+          python -m unittest discover -s tests -v
+          python -m py_compile plugins.v2/mediaratings/__init__.py plugins.v2/mediaratings/client.py
+
+      - name: Validate frontend adapter
+        run: node --check adapters/reverse-proxy/ratings.js && node --check adapters/reverse-proxy/service-worker.js
+
+      - name: Validate marketplace manifest
+        run: jq empty package.v2.json
+
+      - name: Verify version contract
+        run: python tools/check_version.py

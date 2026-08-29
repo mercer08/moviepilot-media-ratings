@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "MediaRatings_v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package plugin
+        run: |
+          release_version="${GITHUB_REF_NAME#MediaRatings_}"
+          cd plugins.v2/mediaratings
+          zip "${GITHUB_WORKSPACE}/mediaratings_${release_version}.zip" README.md __init__.py client.py
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_version="${GITHUB_REF_NAME#MediaRatings_}"
+          gh release create "$GITHUB_REF_NAME" \
+            "mediaratings_${release_version}.zip" \
+            --title "详情页多源评分 ${release_version}" \
+            --generate-notes

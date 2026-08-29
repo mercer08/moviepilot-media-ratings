@@ -1,0 +1,44 @@
+moviepilot.example.com {
+	@ratings_api path /moviepilot-ratings/api/detail
+	handle @ratings_api {
+		rewrite * /api/v1/plugin/MediaRatings/detail
+		reverse_proxy moviepilot:3000
+	}
+
+	@ratings_assets path /moviepilot-ratings/*
+	handle @ratings_assets {
+		header Cache-Control "no-cache, max-age=0"
+		uri strip_prefix /moviepilot-ratings
+		root * /srv/moviepilot-media-ratings
+		file_server
+	}
+
+	@custom_index path / /index.html
+	handle @custom_index {
+		rewrite * /index.html
+		header Cache-Control "no-cache, max-age=0"
+		root * /srv/moviepilot-media-ratings
+		file_server
+	}
+
+	# Optional one-time cache migration. Preserve the upstream worker at
+	# /service-worker-origin.js before serving this replacement at the root.
+	@ratings_worker path /service-worker.js
+	handle @ratings_worker {
+		header Cache-Control "no-store, max-age=0"
+		header Service-Worker-Allowed "/"
+		root * /srv/moviepilot-media-ratings
+		file_server
+	}
+
+	@origin_worker path /service-worker-origin.js
+	handle @origin_worker {
+		rewrite * /service-worker.js
+		header Cache-Control "no-store, max-age=0"
+		reverse_proxy moviepilot:3000
+	}
+
+	handle {
+		reverse_proxy moviepilot:3000
+	}
+}
