@@ -30,10 +30,12 @@ python3 adapters/reverse-proxy/build_index.py \
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/episodes?tmdb_id=93544&season=1'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/card?title=Top%20Boy&media_type=tv&year=2019'
-curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.5.0'
+curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.5.1'
 ```
 
 然后分别打开电影、普通电视剧、动漫详情页、推荐页、搜索结果与豆瓣/IMDb/MAL 榜单，并在
 白色/深色主题间切换。滚动长榜单时，卡片评分应在进入可视区域后逐步出现。
+还需从豆瓣等非 TMDB 榜单点击进入详情页，确认 `mediaid=douban:*` 这类 URL 会按标题、年份与
+类型回退解析并显示完整评分。
 电视剧需展开“季 / 单集评分”并切换不同季，检查来源、链接、加载状态、文字对比度与横向溢出。
 季与单集数据只在首次展开或切换季时加载。

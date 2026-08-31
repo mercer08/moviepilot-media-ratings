@@ -33,7 +33,7 @@ class MediaRatings(_PluginBase):
     plugin_name = "全站多源评分"
     plugin_desc = "在详情页、推荐与榜单卡片聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.5.0"
+    plugin_version = "1.5.1"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"

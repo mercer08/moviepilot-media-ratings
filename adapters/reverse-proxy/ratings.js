@@ -219,15 +219,16 @@
     const params = new URLSearchParams(location.hash.split('?', 2)[1] || '')
     const mediaId = params.get('mediaid') || ''
     const match = mediaId.match(/^tmdb:(\d+)$/)
-    if (!match) return null
     const rawType = (params.get('type') || '').trim().toLowerCase()
     const movieTypes = new Set(['电影', 'movie', 'film'])
-    return {
-      tmdb_id: match[1],
+    const result = {
       media_type: movieTypes.has(rawType) ? 'movie' : 'tv',
       title: params.get('title') || '',
       year: params.get('year') || '',
     }
+    if (match) result.tmdb_id = match[1]
+    if (!result.tmdb_id && !result.title) return null
+    return result
   }
 
   function findMount() {
@@ -412,7 +413,9 @@
       lastKey = ''
       return
     }
-    const key = `${params.media_type}:${params.tmdb_id}`
+    const key = params.tmdb_id
+      ? `${params.media_type}:tmdb:${params.tmdb_id}`
+      : `${params.media_type}:lookup:${params.title}:${params.year}`
     const mount = findMount()
     if (!mount) return
     const currentState = document.getElementById(ROOT_ID)?.dataset.loaded
@@ -426,7 +429,8 @@
     const query = new URLSearchParams(params)
     if (!params.year) query.delete('year')
     try {
-      const response = await fetch(`${API}?${query.toString()}`, {
+      const endpoint = params.tmdb_id ? API : CARD_API
+      const response = await fetch(`${endpoint}?${query.toString()}`, {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
       })

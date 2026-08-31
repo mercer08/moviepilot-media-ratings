@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 TAG = (
     f'<script defer src="/moviepilot-ratings/ratings.js?v={VERSION}" '
     'data-api="/moviepilot-ratings/api/detail" '

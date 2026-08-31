@@ -7,12 +7,17 @@
       const query = new URLSearchParams(location.search)
       const dark = query.get('theme') === 'dark'
       const mediaType = query.get('type') || '电影'
+      const mediaId = query.get('mediaid') || 'tmdb:550'
       document.documentElement.dataset.theme = dark ? 'dark' : 'light'
       document.documentElement.style.setProperty('--v-theme-on-surface', dark ? '231,227,235' : '58,53,65')
       document.documentElement.style.setProperty('--v-theme-surface', dark ? '32,30,36' : '255,255,255')
       document.documentElement.style.background = dark ? '#151419' : '#f4f5fa'
-      location.hash = `#/media?mediaid=tmdb:550&title=Fight%20Club&year=1999&type=${encodeURIComponent(mediaType)}`
+      location.hash = `#/media?mediaid=${encodeURIComponent(mediaId)}&title=Fight%20Club&year=1999&type=${encodeURIComponent(mediaType)}`
       window.fetch = async url => {
+        window.__ratingRequests = [...(window.__ratingRequests || []), String(url)]
+        document.documentElement.dataset.ratingRequests = [
+          document.documentElement.dataset.ratingRequests || '', String(url)
+        ].filter(Boolean).join('|')
         window.__ratingRequest = String(url)
         document.documentElement.dataset.ratingRequest = String(url)
         return {
