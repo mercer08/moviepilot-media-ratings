@@ -19,40 +19,40 @@
     const style = document.createElement('style')
     style.id = 'moviepilot-ratings-style'
     style.textContent = `
-      #${ROOT_ID}{margin:1rem 0 .25rem;grid-column:1/-1}
-      #${ROOT_ID} .mpr-heading{display:flex;align-items:center;gap:.5rem;margin:0 0 .7rem;font-size:1rem;font-weight:650;color:rgba(255,255,255,.9)}
+      #${ROOT_ID}{--mpr-on-surface:var(--v-theme-on-surface,255,255,255);--mpr-surface:var(--v-theme-surface,32,36,44);margin:1rem 0 .25rem;grid-column:1/-1;color:rgb(var(--mpr-on-surface))}
+      #${ROOT_ID} .mpr-heading{display:flex;align-items:center;gap:.5rem;margin:0 0 .7rem;font-size:1rem;font-weight:650;color:rgba(var(--mpr-on-surface),.92)}
       #${ROOT_ID} .mpr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:.65rem}
-      #${ROOT_ID} .mpr-card{position:relative;display:flex;align-items:center;gap:.7rem;min-height:66px;padding:.75rem .85rem;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:rgba(22,25,31,.62);backdrop-filter:blur(12px);color:inherit;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease}
-      #${ROOT_ID} .mpr-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.28);background:rgba(35,39,48,.82)}
-      #${ROOT_ID} .mpr-score{display:grid;place-items:center;flex:0 0 43px;height:43px;border-radius:50%;background:conic-gradient(#8b5cf6 calc(var(--score)*10%),rgba(255,255,255,.12) 0);font-size:.92rem;font-weight:750;color:#fff}
+      #${ROOT_ID} .mpr-card{position:relative;display:flex;align-items:center;gap:.7rem;min-height:66px;padding:.75rem .85rem;border:1px solid rgba(var(--mpr-on-surface),.14);border-radius:13px;background:rgba(var(--mpr-surface),.76);backdrop-filter:blur(12px);color:inherit;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease}
+      #${ROOT_ID} .mpr-card:hover{transform:translateY(-2px);border-color:rgba(var(--mpr-on-surface),.3);background:rgb(var(--mpr-surface))}
+      #${ROOT_ID} .mpr-score{display:grid;place-items:center;flex:0 0 43px;height:43px;border-radius:50%;background:conic-gradient(#8b5cf6 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0);font-size:.92rem;font-weight:750;color:rgb(var(--mpr-on-surface))}
       #${ROOT_ID} .mpr-score{position:relative}
-      #${ROOT_ID} .mpr-score:before{content:'';position:absolute;width:35px;height:35px;border-radius:50%;background:#20242c}
+      #${ROOT_ID} .mpr-score:before{content:'';position:absolute;width:35px;height:35px;border-radius:50%;background:rgb(var(--mpr-surface))}
       #${ROOT_ID} .mpr-score span{position:relative;z-index:1}
       #${ROOT_ID} .mpr-meta{min-width:0;display:flex;flex-direction:column}
       #${ROOT_ID} .mpr-name{font-size:.83rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      #${ROOT_ID} .mpr-votes{margin-top:.16rem;font-size:.7rem;color:rgba(255,255,255,.56)}
-      #${ROOT_ID} .mpr-source-imdb .mpr-score{background:conic-gradient(#f5c518 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-source-douban .mpr-score{background:conic-gradient(#00b51d calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-source-bangumi .mpr-score{background:conic-gradient(#f09199 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-source-rotten_tomatoes .mpr-score{background:conic-gradient(#fa320a calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-source-metacritic .mpr-score{background:conic-gradient(#ffcc34 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-loading,#${ROOT_ID} .mpr-empty{padding:.8rem 1rem;border:1px dashed rgba(255,255,255,.18);border-radius:12px;color:rgba(255,255,255,.62);font-size:.82rem}
-      #${ROOT_ID} .mpr-seasons{margin-top:.8rem;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:rgba(22,25,31,.48);overflow:hidden}
+      #${ROOT_ID} .mpr-votes{margin-top:.16rem;font-size:.7rem;color:rgba(var(--mpr-on-surface),.6)}
+      #${ROOT_ID} .mpr-source-imdb .mpr-score{background:conic-gradient(#f5c518 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
+      #${ROOT_ID} .mpr-source-douban .mpr-score{background:conic-gradient(#00b51d calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
+      #${ROOT_ID} .mpr-source-bangumi .mpr-score{background:conic-gradient(#f09199 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
+      #${ROOT_ID} .mpr-source-rotten_tomatoes .mpr-score{background:conic-gradient(#fa320a calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
+      #${ROOT_ID} .mpr-source-metacritic .mpr-score{background:conic-gradient(#ffcc34 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
+      #${ROOT_ID} .mpr-loading,#${ROOT_ID} .mpr-empty{padding:.8rem 1rem;border:1px dashed rgba(var(--mpr-on-surface),.2);border-radius:12px;color:rgba(var(--mpr-on-surface),.66);font-size:.82rem}
+      #${ROOT_ID} .mpr-seasons{margin-top:.8rem;border:1px solid rgba(var(--mpr-on-surface),.14);border-radius:13px;background:rgba(var(--mpr-surface),.58);overflow:hidden}
       #${ROOT_ID} .mpr-seasons summary{display:flex;align-items:center;gap:.5rem;padding:.8rem .9rem;cursor:pointer;font-size:.86rem;font-weight:650;list-style:none}
       #${ROOT_ID} .mpr-seasons summary::-webkit-details-marker{display:none}
       #${ROOT_ID} .mpr-seasons summary:after{content:'›';margin-left:auto;font-size:1.25rem;transform:rotate(90deg);transition:transform .16s ease}
       #${ROOT_ID} .mpr-seasons[open] summary:after{transform:rotate(-90deg)}
       #${ROOT_ID} .mpr-season-body{padding:0 .9rem .9rem}
       #${ROOT_ID} .mpr-season-toolbar{display:flex;align-items:center;gap:.55rem;margin-bottom:.7rem}
-      #${ROOT_ID} .mpr-season-select{min-width:92px;padding:.42rem .6rem;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#20242c;color:#fff}
+      #${ROOT_ID} .mpr-season-select{min-width:92px;padding:.42rem .6rem;border:1px solid rgba(var(--mpr-on-surface),.22);border-radius:8px;background:rgb(var(--mpr-surface));color:rgb(var(--mpr-on-surface));color-scheme:light dark}
       #${ROOT_ID} .mpr-season-score{margin-bottom:.7rem}
       #${ROOT_ID} .mpr-episode-list{display:grid;gap:.42rem}
-      #${ROOT_ID} .mpr-episode{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:.75rem;padding:.58rem .68rem;border-radius:9px;background:rgba(255,255,255,.045)}
+      #${ROOT_ID} .mpr-episode{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:.75rem;padding:.58rem .68rem;border-radius:9px;background:rgba(var(--mpr-on-surface),.055)}
       #${ROOT_ID} .mpr-episode-title{min-width:0;font-size:.79rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      #${ROOT_ID} .mpr-episode-date{margin-left:.42rem;color:rgba(255,255,255,.48);font-size:.68rem}
+      #${ROOT_ID} .mpr-episode-date{margin-left:.42rem;color:rgba(var(--mpr-on-surface),.52);font-size:.68rem}
       #${ROOT_ID} .mpr-episode-scores{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.32rem}
-      #${ROOT_ID} .mpr-chip{padding:.2rem .42rem;border:1px solid rgba(255,255,255,.14);border-radius:999px;color:rgba(255,255,255,.86);font-size:.67rem;text-decoration:none}
-      #${ROOT_ID} .mpr-chip:hover{border-color:rgba(255,255,255,.34)}
+      #${ROOT_ID} .mpr-chip{padding:.2rem .42rem;border:1px solid rgba(var(--mpr-on-surface),.16);border-radius:999px;color:rgba(var(--mpr-on-surface),.9);font-size:.67rem;text-decoration:none}
+      #${ROOT_ID} .mpr-chip:hover{border-color:rgba(var(--mpr-on-surface),.36)}
       @media (max-width:700px){#${ROOT_ID}{margin-top:.8rem}#${ROOT_ID} .mpr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#${ROOT_ID} .mpr-card{padding:.65rem;gap:.55rem}#${ROOT_ID} .mpr-score{flex-basis:39px;height:39px}#${ROOT_ID} .mpr-score:before{width:32px;height:32px}#${ROOT_ID} .mpr-episode{grid-template-columns:1fr;gap:.42rem}#${ROOT_ID} .mpr-episode-scores{justify-content:flex-start}}
     `
     document.head.appendChild(style)
@@ -64,10 +64,11 @@
     const mediaId = params.get('mediaid') || ''
     const match = mediaId.match(/^tmdb:(\d+)$/)
     if (!match) return null
-    const rawType = params.get('type') || ''
+    const rawType = (params.get('type') || '').trim().toLowerCase()
+    const movieTypes = new Set(['电影', 'movie', 'film'])
     return {
       tmdb_id: match[1],
-      media_type: rawType === '电影' ? 'movie' : 'tv',
+      media_type: movieTypes.has(rawType) ? 'movie' : 'tv',
       title: params.get('title') || '',
       year: params.get('year') || '',
     }

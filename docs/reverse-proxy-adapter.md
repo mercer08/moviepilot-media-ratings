@@ -28,8 +28,9 @@ python3 adapters/reverse-proxy/build_index.py \
 ```bash
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/episodes?tmdb_id=93544&season=1'
-curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.3.0'
+curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.4.0'
 ```
 
-然后分别打开普通电视剧、动漫详情页及 390px 宽移动端页面，展开“季 / 单集评分”，切换不同季，
-检查来源、链接、加载状态与横向溢出。季与单集数据只在首次展开或切换季时加载。
+然后分别打开电影、普通电视剧、动漫详情页及 390px 宽移动端页面，并在白色/深色主题间切换。
+电视剧需展开“季 / 单集评分”并切换不同季，检查来源、链接、加载状态、文字对比度与横向溢出。
+季与单集数据只在首次展开或切换季时加载。

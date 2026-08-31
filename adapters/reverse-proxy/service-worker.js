@@ -1,4 +1,4 @@
-/* MoviePilot app-shell cache migration for the multi-source ratings UI v1.3.0. */
+/* MoviePilot app-shell cache migration for the multi-source ratings UI v1.4.0. */
 'use strict'
 
 self.addEventListener('install', () => self.skipWaiting())

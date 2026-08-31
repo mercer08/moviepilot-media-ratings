@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>MediaRatings theme harness</title>
+    <script>
+      const query = new URLSearchParams(location.search)
+      const dark = query.get('theme') === 'dark'
+      const mediaType = query.get('type') || '电影'
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      document.documentElement.style.setProperty('--v-theme-on-surface', dark ? '231,227,235' : '58,53,65')
+      document.documentElement.style.setProperty('--v-theme-surface', dark ? '32,30,36' : '255,255,255')
+      document.documentElement.style.background = dark ? '#151419' : '#f4f5fa'
+      location.hash = `#/media?mediaid=tmdb:550&title=Fight%20Club&year=1999&type=${encodeURIComponent(mediaType)}`
+      window.fetch = async url => {
+        window.__ratingRequest = String(url)
+        document.documentElement.dataset.ratingRequest = String(url)
+        return {
+          ok: true,
+          json: async () => ({
+            tmdb_id: 550,
+            media_type: 'movie',
+            anime: false,
+            sources: [
+              {id: 'tmdb', name: 'TMDB', score: 8.4, votes: 33000, url: '#tmdb'},
+              {id: 'imdb', name: 'IMDb', score: 8.8, votes: 2655000, url: '#imdb'},
+              {id: 'rotten_tomatoes', name: 'Rotten Tomatoes', score: 8.1, display: '81%', url: '#rt'},
+              {id: 'metacritic', name: 'Metacritic', score: 6.7, display: '67/100', url: '#mc'},
+              {id: 'douban', name: '豆瓣', score: 9.0, votes: 991000, url: '#douban'}
+            ]
+          })
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="media-page">
+      <div class="media-overview">电影简介</div>
+    </main>
+    <script src="../adapters/reverse-proxy/ratings.js" data-api="/mock/detail"></script>
+  </body>
+</html>
