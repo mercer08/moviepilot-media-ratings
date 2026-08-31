@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from difflib import SequenceMatcher
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 def normalize_score(value: Any, scale: float = 10.0) -> Optional[float]:
@@ -167,3 +167,106 @@ def omdb_ratings(payload: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
             "display": f"{int(metascore * 10)}/100",
         }
     return values
+
+
+def precision_date(value: Any) -> str:
+    """Normalize an ISO date or an IMDb precision-date object to YYYY-MM-DD."""
+
+    if isinstance(value, dict):
+        try:
+            year = int(value.get("year"))
+            month = int(value.get("month"))
+            day = int(value.get("day"))
+            return f"{year:04d}-{month:02d}-{day:02d}"
+        except (TypeError, ValueError):
+            return ""
+    match = re.search(r"\b(19|20)\d{2}-\d{2}-\d{2}\b", str(value or ""))
+    return match.group(0) if match else ""
+
+
+def match_episode_candidates(
+    anchors: Iterable[Dict[str, Any]],
+    candidates: Iterable[Dict[str, Any]],
+) -> Dict[int, Dict[str, Any]]:
+    """Match external episodes to TMDB anchors without trusting season numbering."""
+
+    available: List[Dict[str, Any]] = list(candidates or [])
+    matches: Dict[int, Dict[str, Any]] = {}
+    used: set[int] = set()
+    for anchor in anchors or []:
+        try:
+            episode_number = int(anchor.get("episode_number"))
+        except (TypeError, ValueError):
+            continue
+        anchor_title = normalized_title(anchor.get("name") or anchor.get("title"))
+        anchor_date = precision_date(anchor.get("air_date") or anchor.get("release_date"))
+        best_index = -1
+        best_score = 0.0
+        for index, candidate in enumerate(available):
+            if index in used:
+                continue
+            candidate_title = normalized_title(candidate.get("title") or candidate.get("name"))
+            candidate_date = precision_date(
+                candidate.get("air_date")
+                or candidate.get("airdate")
+                or candidate.get("release_date")
+                or candidate.get("releaseDate")
+            )
+            similarity = (
+                SequenceMatcher(None, anchor_title, candidate_title).ratio()
+                if anchor_title and candidate_title
+                else 0.0
+            )
+            score = similarity * 0.72
+            if anchor_date and candidate_date and anchor_date == candidate_date:
+                score += 0.72
+            try:
+                candidate_number = int(
+                    candidate.get("episode_number")
+                    or candidate.get("episodeNumber")
+                    or candidate.get("number")
+                )
+            except (TypeError, ValueError):
+                candidate_number = None
+            if candidate_number == episode_number:
+                score += 0.16
+            if score > best_score:
+                best_index = index
+                best_score = score
+        if best_index >= 0 and best_score >= 0.72:
+            used.add(best_index)
+            matches[episode_number] = available[best_index]
+    return matches
+
+
+def aggregate_episode_source(
+    source_id: str,
+    name: str,
+    episodes: Iterable[Dict[str, Any]],
+    url: str,
+) -> Optional[Dict[str, Any]]:
+    """Build a season score from episode scores, weighting sources with votes."""
+
+    scored = [item for item in episodes or [] if normalize_score(item.get("score")) is not None]
+    if not scored:
+        return None
+    weighted = [item for item in scored if normalize_votes(item.get("votes"))]
+    if weighted:
+        total_votes = sum(normalize_votes(item.get("votes")) or 0 for item in weighted)
+        score = sum(
+            (normalize_score(item.get("score")) or 0) * (normalize_votes(item.get("votes")) or 0)
+            for item in weighted
+        ) / total_votes
+        votes: Optional[int] = total_votes
+    else:
+        score = sum(normalize_score(item.get("score")) or 0 for item in scored) / len(scored)
+        votes = None
+    return {
+        "id": source_id,
+        "name": name,
+        "score": round(score, 1),
+        "display": f"{score:.1f}",
+        "votes": votes,
+        "episodes": len(scored),
+        "url": url,
+    }

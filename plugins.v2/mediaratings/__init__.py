@@ -18,6 +18,8 @@ from app.schemas.types import MediaType
 from app.utils.http import AsyncRequestUtils
 
 from .client import (
+    aggregate_episode_source,
+    match_episode_candidates,
     normalize_score,
     normalize_votes,
     omdb_ratings,
@@ -28,9 +30,9 @@ from .client import (
 
 class MediaRatings(_PluginBase):
     plugin_name = "详情页多源评分"
-    plugin_desc = "聚合 TMDB、IMDb、TVmaze、豆瓣；动漫追加 Bangumi，可选 OMDb 扩展烂番茄与 Metacritic。"
+    plugin_desc = "聚合作品、季与单集的 TMDB、IMDb、TVmaze、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.1.0"
+    plugin_version = "1.2.0"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"
@@ -73,7 +75,14 @@ class MediaRatings(_PluginBase):
                 "methods": ["GET"],
                 "summary": "获取媒体详情页多源评分",
                 "allow_anonymous": True,
-            }
+            },
+            {
+                "path": "/episodes",
+                "endpoint": self.episodes,
+                "methods": ["GET"],
+                "summary": "获取指定季及单集的多源评分",
+                "allow_anonymous": True,
+            },
         ]
 
     def get_form(self) -> Tuple[Optional[List[dict]], Dict[str, Any]]:
@@ -177,6 +186,26 @@ class MediaRatings(_PluginBase):
             self.save_data(cache_key, result)
         return result
 
+    async def episodes(
+        self,
+        tmdb_id: int = Query(..., ge=1),
+        season: int = Query(..., ge=0, le=200),
+    ) -> Dict[str, Any]:
+        """Return a lazily loaded season and episode rating projection."""
+
+        if not self._enabled:
+            return {"tmdb_id": tmdb_id, "season": season, "sources": [], "episodes": []}
+        cache_key = f"episodes:v1:{tmdb_id}:{season}"
+        cached = self._memory_cache.get(cache_key) or self.get_data(cache_key)
+        if self._fresh(cached):
+            self._memory_cache[cache_key] = cached
+            return cached
+        result = await self._collect_episodes(tmdb_id, season)
+        if result.get("episodes"):
+            self._memory_cache[cache_key] = result
+            self.save_data(cache_key, result)
+        return result
+
     async def _collect(
         self, tmdb_id: int, media_type: str, title: str, year: Optional[int]
     ) -> Dict[str, Any]:
@@ -272,9 +301,180 @@ class MediaRatings(_PluginBase):
             "media_type": media_type,
             "title": resolved_title or title,
             "anime": is_anime,
+            "seasons": self._season_numbers(tmdb) if media_type == "tv" else [],
             "fetched_at": int(time.time()),
             "sources": [sources[key] for key in order if key in sources],
         }
+
+    async def _collect_episodes(self, tmdb_id: int, season: int) -> Dict[str, Any]:
+        """Use TMDB episodes as anchors, then merge IMDb and TVmaze by date/title."""
+
+        try:
+            tmdb = await self._tmdb.async_get_info(
+                mtype=MediaType.TV, tmdbid=tmdb_id
+            ) or {}
+            season_info = await self._tmdb.async_get_tv_season_detail(
+                tmdbid=tmdb_id, season=season
+            ) or {}
+        except Exception as error:
+            logger.warning(
+                f"MediaRatings TMDB season lookup failed for {tmdb_id} S{season}: {error}"
+            )
+            tmdb, season_info = {}, {}
+
+        anchors = sorted(
+            [item for item in season_info.get("episodes") or [] if isinstance(item, dict)],
+            key=lambda item: int(item.get("episode_number") or 0),
+        )
+        external_ids = tmdb.get("external_ids") or {}
+        imdb_id = str(tmdb.get("imdb_id") or external_ids.get("imdb_id") or "").strip()
+        original_title = str(
+            tmdb.get("original_title") or tmdb.get("original_name") or tmdb.get("name") or ""
+        ).strip()
+
+        imdb_matches, tvmaze_matches = await asyncio.gather(
+            self._imdb_episode_matches(imdb_id, anchors, season),
+            self._tvmaze_episode_matches(imdb_id, original_title, anchors),
+        )
+        source_rows: Dict[str, List[Dict[str, Any]]] = {
+            "tmdb": [], "imdb": [], "tvmaze": []
+        }
+        episodes: List[Dict[str, Any]] = []
+        for anchor in anchors:
+            number = int(anchor.get("episode_number") or 0)
+            row_sources: List[Dict[str, Any]] = []
+            tmdb_score = normalize_score(anchor.get("vote_average"))
+            if tmdb_score is not None:
+                item = self._source(
+                    "tmdb", "TMDB", tmdb_score, anchor.get("vote_count"),
+                    f"https://www.themoviedb.org/tv/{tmdb_id}/season/{season}/episode/{number}",
+                )
+                row_sources.append(item)
+                source_rows["tmdb"].append(item)
+
+            imdb = imdb_matches.get(number)
+            imdb_rating = (imdb or {}).get("rating") or {}
+            imdb_score = normalize_score(
+                imdb_rating.get("aggregateRating")
+                if isinstance(imdb_rating, dict) else None
+            )
+            if imdb_score is not None:
+                imdb_episode_id = str((imdb or {}).get("id") or "")
+                item = self._source(
+                    "imdb", "IMDb", imdb_score,
+                    imdb_rating.get("voteCount") if isinstance(imdb_rating, dict) else None,
+                    f"https://www.imdb.com/title/{imdb_episode_id}/",
+                )
+                row_sources.append(item)
+                source_rows["imdb"].append(item)
+
+            tvmaze = tvmaze_matches.get(number)
+            tvmaze_score = normalize_score(((tvmaze or {}).get("rating") or {}).get("average"))
+            if tvmaze_score is not None:
+                item = self._source(
+                    "tvmaze", "TVmaze", tvmaze_score, None,
+                    str((tvmaze or {}).get("url") or "https://www.tvmaze.com/"),
+                )
+                row_sources.append(item)
+                source_rows["tvmaze"].append(item)
+
+            episodes.append({
+                "season": season,
+                "episode": number,
+                "title": anchor.get("name") or f"第 {number} 集",
+                "air_date": anchor.get("air_date") or "",
+                "sources": row_sources,
+            })
+
+        season_sources = []
+        source_meta = {
+            "tmdb": ("TMDB", f"https://www.themoviedb.org/tv/{tmdb_id}/season/{season}"),
+            "imdb": ("IMDb", f"https://www.imdb.com/title/{imdb_id}/episodes/"),
+            "tvmaze": ("TVmaze", "https://www.tvmaze.com/"),
+        }
+        for source_id in ("tmdb", "imdb", "tvmaze"):
+            name, url = source_meta[source_id]
+            aggregate = aggregate_episode_source(
+                source_id, name, source_rows[source_id], url
+            )
+            if aggregate:
+                season_sources.append(aggregate)
+        return {
+            "tmdb_id": tmdb_id,
+            "season": season,
+            "title": season_info.get("name") or f"第 {season} 季",
+            "fetched_at": int(time.time()),
+            "sources": season_sources,
+            "episodes": episodes,
+        }
+
+    async def _imdb_episode_matches(
+        self, imdb_id: str, anchors: List[Dict[str, Any]], requested_season: int
+    ) -> Dict[int, Dict[str, Any]]:
+        """Search likely IMDb seasons and stop after the TMDB anchors match."""
+
+        if not imdb_id or not anchors:
+            return {}
+        client = AsyncRequestUtils(timeout=12)
+        try:
+            season_payload = await client.get_json(
+                f"https://api.tiffara.com/titles/{imdb_id}/seasons"
+            ) or {}
+            raw_seasons = season_payload.get("seasons") or []
+            seasons = []
+            for item in raw_seasons:
+                value = item.get("season") if isinstance(item, dict) else item
+                try:
+                    seasons.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+            seasons = sorted(set(seasons), key=lambda value: (abs(value - requested_season), value))
+            if requested_season not in seasons:
+                seasons.insert(0, requested_season)
+            candidates: List[Dict[str, Any]] = []
+            for imdb_season in seasons[:8]:
+                payload = await client.get_json(
+                    f"https://api.tiffara.com/titles/{imdb_id}/episodes",
+                    params={"season": imdb_season, "pageSize": 50},
+                ) or {}
+                candidates.extend(payload.get("episodes") or [])
+                matches = match_episode_candidates(anchors, candidates)
+                if len(matches) >= max(1, int(len(anchors) * 0.7)):
+                    return matches
+            return match_episode_candidates(anchors, candidates)
+        except Exception as error:
+            logger.info(f"MediaRatings IMDb episode lookup unavailable for {imdb_id}: {error}")
+            return {}
+
+    async def _tvmaze_episode_matches(
+        self, imdb_id: str, title: str, anchors: List[Dict[str, Any]]
+    ) -> Dict[int, Dict[str, Any]]:
+        """Fetch a TVmaze episode list and align it to TMDB anchors."""
+
+        if not anchors:
+            return {}
+        try:
+            client = AsyncRequestUtils(timeout=10)
+            if imdb_id:
+                show = await client.get_json(
+                    "https://api.tvmaze.com/lookup/shows", params={"imdb": imdb_id}
+                )
+            elif title:
+                show = await client.get_json(
+                    "https://api.tvmaze.com/singlesearch/shows", params={"q": title}
+                )
+            else:
+                return {}
+            show_id = (show or {}).get("id")
+            if not show_id:
+                return {}
+            candidates = await client.get_json(
+                f"https://api.tvmaze.com/shows/{show_id}/episodes"
+            ) or []
+            return match_episode_candidates(anchors, candidates)
+        except Exception as error:
+            logger.info(f"MediaRatings TVmaze episode lookup unavailable: {error}")
+            return {}
 
     async def _imdb(
         self, imdb_id: str, title: str, year: Optional[int], media_type: str
@@ -398,7 +598,7 @@ class MediaRatings(_PluginBase):
         try:
             data = await AsyncRequestUtils(
                 headers={
-                    "User-Agent": "MoviePilot-MediaRatings/1.1 (+https://github.com/mercer08/moviepilot-media-ratings)",
+                    "User-Agent": "MoviePilot-MediaRatings/1.2 (+https://github.com/mercer08/moviepilot-media-ratings)",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                 },
@@ -458,6 +658,19 @@ class MediaRatings(_PluginBase):
             return int(str(value)[:4])
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _season_numbers(tmdb: Dict[str, Any]) -> List[int]:
+        numbers = set()
+        for item in tmdb.get("seasons") or []:
+            value = item.get("season_number") if isinstance(item, dict) else None
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= number <= 200:
+                numbers.add(number)
+        return sorted(numbers)
 
     @staticmethod
     def _is_anime(tmdb: Dict[str, Any]) -> bool:

@@ -59,6 +59,52 @@ class MediaRatingsClientTest(unittest.TestCase):
         self.assertEqual(ratings["rotten_tomatoes"]["score"], 9.1)
         self.assertEqual(ratings["metacritic"]["score"], 7.7)
 
+    def test_matches_episode_by_airdate_when_imdb_season_number_differs(self):
+        anchors = [
+            {"episode_number": 1, "name": "Bruk Up", "air_date": "2019-09-13"},
+            {"episode_number": 2, "name": "Building Bridges", "air_date": "2019-09-13"},
+        ]
+        candidates = [
+            {
+                "id": "tt-old",
+                "title": "Episode #1.1",
+                "season": "1",
+                "episodeNumber": 1,
+                "releaseDate": {"year": 2011, "month": 10, "day": 31},
+            },
+            {
+                "id": "tt-new-1",
+                "title": "Bruk Up",
+                "season": "3",
+                "episodeNumber": 1,
+                "releaseDate": {"year": 2019, "month": 9, "day": 13},
+            },
+            {
+                "id": "tt-new-2",
+                "title": "Building Bridges",
+                "season": "3",
+                "episodeNumber": 2,
+                "releaseDate": {"year": 2019, "month": 9, "day": 13},
+            },
+        ]
+        matches = CLIENT.match_episode_candidates(anchors, candidates)
+        self.assertEqual(matches[1]["id"], "tt-new-1")
+        self.assertEqual(matches[2]["id"], "tt-new-2")
+
+    def test_aggregates_season_score_with_vote_weighting(self):
+        result = CLIENT.aggregate_episode_source(
+            "imdb",
+            "IMDb",
+            [
+                {"score": 8.0, "votes": 100},
+                {"score": 9.0, "votes": 300},
+            ],
+            "https://example.test/episodes",
+        )
+        self.assertEqual(result["score"], 8.8)
+        self.assertEqual(result["votes"], 400)
+        self.assertEqual(result["episodes"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

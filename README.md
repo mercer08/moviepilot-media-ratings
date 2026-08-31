@@ -9,6 +9,8 @@
 ## 功能
 
 - 以 TMDB ID 为稳定主键，结合原始标题、年份和媒体类型消除同名误匹配
+- 电视剧支持季汇总分与逐集评分，展开后按需加载，不拖慢作品详情首屏
+- 不强行按季号对齐：通过单集标题、首播日期和集号匹配 IMDb / TVmaze，兼容续作季号差异
 - 并行读取多个公开数据源，统一为 `0–10` 分制
 - 返回投票人数和可点击的来源链接
 - 日语动画自动追加 Bangumi，普通影视不发起 Bangumi 请求
@@ -34,6 +36,7 @@
 
 ```text
 GET /api/v1/plugin/MediaRatings/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019
+GET /api/v1/plugin/MediaRatings/episodes?tmdb_id=93544&season=1
 ```
 
 ## 关于“详情页”显示
@@ -55,6 +58,11 @@ TVDB ID、语言、国家和类型。随后并行查询 TVmaze、豆瓣和（仅
 配置 OMDb 时补充影评聚合站评分。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
 低置信度结果直接丢弃，避免“有分但作品错了”。
 
+季与单集接口以 TMDB 的单集清单为锚点，再把 IMDb 和 TVmaze 的候选集按标题、完整首播日期及
+集号评分匹配。匹配过程不把季号当作唯一依据，例如 2019 版《上层男孩》在 TMDB 的第 1 季可
+正确对应 IMDb 延续旧版编号后的第 3 季。季评分由已匹配的单集评分汇总；有投票数的平台使用
+投票数加权平均，否则使用算术平均，并在返回中给出实际参与汇总的集数。
+
 返回示例：
 
 ```json
@@ -65,6 +73,29 @@ TVDB ID、语言、国家和类型。随后并行查询 TVmaze、豆瓣和（仅
   "sources": [
     {"id": "tmdb", "name": "TMDB", "score": 8.0, "votes": 162, "url": "..."},
     {"id": "imdb", "name": "IMDb", "score": 8.4, "votes": 50000, "url": "..."}
+  ]
+}
+```
+
+单季返回示例：
+
+```json
+{
+  "tmdb_id": 93544,
+  "season": 1,
+  "sources": [
+    {"id": "imdb", "name": "IMDb", "score": 8.4, "votes": 7698, "episodes": 10}
+  ],
+  "episodes": [
+    {
+      "season": 1,
+      "episode": 1,
+      "title": "Bruk Up",
+      "sources": [
+        {"id": "tmdb", "name": "TMDB", "score": 7.8},
+        {"id": "imdb", "name": "IMDb", "score": 7.8}
+      ]
+    }
   ]
 }
 ```

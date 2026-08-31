@@ -1,15 +1,16 @@
 {
   "MediaRatings": {
     "name": "详情页多源评分",
-    "description": "聚合 TMDB、IMDb、TVmaze、豆瓣评分；动漫追加 Bangumi，可选 OMDb 扩展烂番茄与 Metacritic。",
+    "description": "聚合作品、季与单集的 TMDB、IMDb、TVmaze、豆瓣评分；动漫追加 Bangumi。",
     "labels": "评分,详情页,IMDb,豆瓣,Bangumi",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "icon": "https://cdn.jsdelivr.net/gh/Templarian/MaterialDesign-Webfont@master/svg/star-box-multiple-outline.svg",
     "author": "mercer08",
     "level": 1,
     "system_version": ">=2.15.1,<3",
     "release": true,
     "history": {
+      "v1.2.0": "新增季平均分与单集评分，按首播日期和标题跨平台匹配，兼容不同季编号",
       "v1.1.0": "首个公开版本：标准化插件配置、市场清单、CI、Release 与可选详情页适配器",
       "v1.0.2": "绕开原生 Service Worker 的 API 缓存并防止重复评分请求",
       "v1.0.1": "修复原始标题匹配、旧缓存命中及评分前端资源发布",

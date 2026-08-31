@@ -13,8 +13,9 @@ SPEC.loader.exec_module(BUILD)
 class AdapterBuilderTest(unittest.TestCase):
     def test_injects_versioned_script_and_dedicated_api_path(self):
         output = BUILD.inject("<!doctype html><html><head></head><body></body></html>")
-        self.assertIn('/moviepilot-ratings/ratings.js?v=1.1.0', output)
+        self.assertIn('/moviepilot-ratings/ratings.js?v=1.2.0', output)
         self.assertIn('data-api="/moviepilot-ratings/api/detail"', output)
+        self.assertIn('data-episodes-api="/moviepilot-ratings/api/episodes"', output)
         self.assertLess(output.index("ratings.js"), output.index("</head>"))
 
     def test_rejects_duplicate_injection(self):

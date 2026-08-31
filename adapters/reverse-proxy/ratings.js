@@ -3,6 +3,7 @@
 
   const loader = document.currentScript
   const API = loader?.dataset.api || '/api/v1/plugin/MediaRatings/detail'
+  const EPISODE_API = loader?.dataset.episodesApi || API.replace(/\/detail$/, '/episodes')
   const ROOT_ID = 'moviepilot-multi-source-ratings'
   let requestSerial = 0
   let lastKey = ''
@@ -24,6 +25,7 @@
       #${ROOT_ID} .mpr-card{position:relative;display:flex;align-items:center;gap:.7rem;min-height:66px;padding:.75rem .85rem;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:rgba(22,25,31,.62);backdrop-filter:blur(12px);color:inherit;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease}
       #${ROOT_ID} .mpr-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.28);background:rgba(35,39,48,.82)}
       #${ROOT_ID} .mpr-score{display:grid;place-items:center;flex:0 0 43px;height:43px;border-radius:50%;background:conic-gradient(#8b5cf6 calc(var(--score)*10%),rgba(255,255,255,.12) 0);font-size:.92rem;font-weight:750;color:#fff}
+      #${ROOT_ID} .mpr-score{position:relative}
       #${ROOT_ID} .mpr-score:before{content:'';position:absolute;width:35px;height:35px;border-radius:50%;background:#20242c}
       #${ROOT_ID} .mpr-score span{position:relative;z-index:1}
       #${ROOT_ID} .mpr-meta{min-width:0;display:flex;flex-direction:column}
@@ -34,8 +36,25 @@
       #${ROOT_ID} .mpr-source-bangumi .mpr-score{background:conic-gradient(#f09199 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-source-rotten_tomatoes .mpr-score{background:conic-gradient(#fa320a calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-source-metacritic .mpr-score{background:conic-gradient(#ffcc34 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
+      #${ROOT_ID} .mpr-source-tvmaze .mpr-score{background:conic-gradient(#3c948b calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-loading,#${ROOT_ID} .mpr-empty{padding:.8rem 1rem;border:1px dashed rgba(255,255,255,.18);border-radius:12px;color:rgba(255,255,255,.62);font-size:.82rem}
-      @media (max-width:700px){#${ROOT_ID}{margin-top:.8rem}#${ROOT_ID} .mpr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#${ROOT_ID} .mpr-card{padding:.65rem;gap:.55rem}#${ROOT_ID} .mpr-score{flex-basis:39px;height:39px}#${ROOT_ID} .mpr-score:before{width:32px;height:32px}}
+      #${ROOT_ID} .mpr-seasons{margin-top:.8rem;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:rgba(22,25,31,.48);overflow:hidden}
+      #${ROOT_ID} .mpr-seasons summary{display:flex;align-items:center;gap:.5rem;padding:.8rem .9rem;cursor:pointer;font-size:.86rem;font-weight:650;list-style:none}
+      #${ROOT_ID} .mpr-seasons summary::-webkit-details-marker{display:none}
+      #${ROOT_ID} .mpr-seasons summary:after{content:'›';margin-left:auto;font-size:1.25rem;transform:rotate(90deg);transition:transform .16s ease}
+      #${ROOT_ID} .mpr-seasons[open] summary:after{transform:rotate(-90deg)}
+      #${ROOT_ID} .mpr-season-body{padding:0 .9rem .9rem}
+      #${ROOT_ID} .mpr-season-toolbar{display:flex;align-items:center;gap:.55rem;margin-bottom:.7rem}
+      #${ROOT_ID} .mpr-season-select{min-width:92px;padding:.42rem .6rem;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:#20242c;color:#fff}
+      #${ROOT_ID} .mpr-season-score{margin-bottom:.7rem}
+      #${ROOT_ID} .mpr-episode-list{display:grid;gap:.42rem}
+      #${ROOT_ID} .mpr-episode{display:grid;grid-template-columns:minmax(150px,1fr) auto;align-items:center;gap:.75rem;padding:.58rem .68rem;border-radius:9px;background:rgba(255,255,255,.045)}
+      #${ROOT_ID} .mpr-episode-title{min-width:0;font-size:.79rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${ROOT_ID} .mpr-episode-date{margin-left:.42rem;color:rgba(255,255,255,.48);font-size:.68rem}
+      #${ROOT_ID} .mpr-episode-scores{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.32rem}
+      #${ROOT_ID} .mpr-chip{padding:.2rem .42rem;border:1px solid rgba(255,255,255,.14);border-radius:999px;color:rgba(255,255,255,.86);font-size:.67rem;text-decoration:none}
+      #${ROOT_ID} .mpr-chip:hover{border-color:rgba(255,255,255,.34)}
+      @media (max-width:700px){#${ROOT_ID}{margin-top:.8rem}#${ROOT_ID} .mpr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#${ROOT_ID} .mpr-card{padding:.65rem;gap:.55rem}#${ROOT_ID} .mpr-score{flex-basis:39px;height:39px}#${ROOT_ID} .mpr-score:before{width:32px;height:32px}#${ROOT_ID} .mpr-episode{grid-template-columns:1fr;gap:.42rem}#${ROOT_ID} .mpr-episode-scores{justify-content:flex-start}}
     `
     document.head.appendChild(style)
   }
@@ -72,43 +91,162 @@
     return root
   }
 
-  function render(root, payload) {
+  function sourceCard(source) {
+    const card = document.createElement('a')
+    card.className = `mpr-card ${sourceClass(source.id)}`
+    card.href = source.url || '#'
+    card.target = '_blank'
+    card.rel = 'noopener noreferrer'
+    card.style.setProperty('--score', String(Math.max(0, Math.min(10, Number(source.score) || 0))))
+    const score = document.createElement('div')
+    score.className = 'mpr-score'
+    const scoreText = document.createElement('span')
+    scoreText.textContent = source.display || Number(source.score).toFixed(1)
+    score.appendChild(scoreText)
+    const meta = document.createElement('div')
+    meta.className = 'mpr-meta'
+    const name = document.createElement('span')
+    name.className = 'mpr-name'
+    name.textContent = source.name
+    const votes = document.createElement('span')
+    votes.className = 'mpr-votes'
+    votes.textContent = voteLabel(source.votes) || (source.episodes ? `${source.episodes} 集` : '点击查看来源')
+    meta.append(name, votes)
+    card.append(score, meta)
+    return card
+  }
+
+  function renderSeasonResult(target, payload) {
+    target.replaceChildren()
     const sources = Array.isArray(payload?.sources) ? payload.sources : []
-    if (!sources.length) {
-      root.innerHTML = '<div class="mpr-empty">暂未匹配到其他平台评分</div>'
+    if (sources.length) {
+      const grid = document.createElement('div')
+      grid.className = 'mpr-grid mpr-season-score'
+      for (const source of sources) grid.appendChild(sourceCard(source))
+      target.appendChild(grid)
+    }
+    const episodes = Array.isArray(payload?.episodes) ? payload.episodes : []
+    if (!episodes.length) {
+      const empty = document.createElement('div')
+      empty.className = 'mpr-empty'
+      empty.textContent = '这一季暂未匹配到单集信息'
+      target.appendChild(empty)
       return
     }
+    const list = document.createElement('div')
+    list.className = 'mpr-episode-list'
+    for (const episode of episodes) {
+      const row = document.createElement('div')
+      row.className = 'mpr-episode'
+      const title = document.createElement('div')
+      title.className = 'mpr-episode-title'
+      title.textContent = `E${String(episode.episode || 0).padStart(2, '0')} · ${episode.title || '未命名'}`
+      if (episode.air_date) {
+        const date = document.createElement('span')
+        date.className = 'mpr-episode-date'
+        date.textContent = episode.air_date
+        title.appendChild(date)
+      }
+      const scores = document.createElement('div')
+      scores.className = 'mpr-episode-scores'
+      for (const source of episode.sources || []) {
+        const chip = document.createElement('a')
+        chip.className = `mpr-chip ${sourceClass(source.id)}`
+        chip.href = source.url || '#'
+        chip.target = '_blank'
+        chip.rel = 'noopener noreferrer'
+        chip.textContent = `${source.name} ${source.display || Number(source.score).toFixed(1)}`
+        scores.appendChild(chip)
+      }
+      if (!scores.childElementCount) scores.textContent = '暂无评分'
+      row.append(title, scores)
+      list.appendChild(row)
+    }
+    target.appendChild(list)
+  }
+
+  function episodePanel(payload) {
+    const seasons = (Array.isArray(payload?.seasons) ? payload.seasons : [])
+      .map(Number).filter(Number.isInteger).sort((a, b) => a - b)
+    if (payload?.media_type !== 'tv' || !seasons.length) return null
+    const panel = document.createElement('details')
+    panel.className = 'mpr-seasons'
+    const summary = document.createElement('summary')
+    summary.textContent = '季 / 单集评分'
+    const body = document.createElement('div')
+    body.className = 'mpr-season-body'
+    const toolbar = document.createElement('div')
+    toolbar.className = 'mpr-season-toolbar'
+    const select = document.createElement('select')
+    select.className = 'mpr-season-select'
+    select.setAttribute('aria-label', '选择季')
+    for (const season of seasons) {
+      const option = document.createElement('option')
+      option.value = String(season)
+      option.textContent = season === 0 ? '特别篇' : `第 ${season} 季`
+      select.appendChild(option)
+    }
+    const initial = seasons.find(value => value > 0) ?? seasons[0]
+    select.value = String(initial)
+    const status = document.createElement('span')
+    status.className = 'mpr-votes'
+    status.textContent = '展开后按需加载'
+    const result = document.createElement('div')
+    toolbar.append(select, status)
+    body.append(toolbar, result)
+    panel.append(summary, body)
+
+    let loadedSeason = null
+    let loadSerial = 0
+    const load = async () => {
+      const season = Number(select.value)
+      if (!Number.isInteger(season) || loadedSeason === season) return
+      const serial = ++loadSerial
+      status.textContent = '正在匹配 IMDb、TMDB 与 TVmaze…'
+      result.innerHTML = '<div class="mpr-loading">正在加载季与单集评分…</div>'
+      try {
+        const query = new URLSearchParams({ tmdb_id: payload.tmdb_id, season })
+        const response = await fetch(`${EPISODE_API}?${query}`, {
+          credentials: 'same-origin', headers: { Accept: 'application/json' },
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json()
+        if (serial !== loadSerial) return
+        loadedSeason = season
+        status.textContent = '季评分按已匹配单集汇总'
+        renderSeasonResult(result, data)
+      } catch (error) {
+        if (serial !== loadSerial) return
+        status.textContent = '加载失败，可切换季重试'
+        result.innerHTML = '<div class="mpr-empty">季与单集评分暂时不可用</div>'
+        console.warn('[MediaRatings] episode request failed', error)
+      }
+    }
+    panel.addEventListener('toggle', () => { if (panel.open) load() })
+    select.addEventListener('change', load)
+    return panel
+  }
+
+  function render(root, payload) {
+    const sources = Array.isArray(payload?.sources) ? payload.sources : []
     root.replaceChildren()
     const heading = document.createElement('h2')
     heading.className = 'mpr-heading'
     heading.textContent = payload.anime ? '主流评分 · 动漫' : '主流评分'
-    const grid = document.createElement('div')
-    grid.className = 'mpr-grid'
-    for (const source of sources) {
-      const card = document.createElement('a')
-      card.className = `mpr-card ${sourceClass(source.id)}`
-      card.href = source.url || '#'
-      card.target = '_blank'
-      card.rel = 'noopener noreferrer'
-      card.style.setProperty('--score', String(Math.max(0, Math.min(10, Number(source.score) || 0))))
-      const score = document.createElement('div')
-      score.className = 'mpr-score'
-      const scoreText = document.createElement('span')
-      scoreText.textContent = source.display || Number(source.score).toFixed(1)
-      score.appendChild(scoreText)
-      const meta = document.createElement('div')
-      meta.className = 'mpr-meta'
-      const name = document.createElement('span')
-      name.className = 'mpr-name'
-      name.textContent = source.name
-      const votes = document.createElement('span')
-      votes.className = 'mpr-votes'
-      votes.textContent = voteLabel(source.votes) || '点击查看来源'
-      meta.append(name, votes)
-      card.append(score, meta)
-      grid.appendChild(card)
+    root.appendChild(heading)
+    if (sources.length) {
+      const grid = document.createElement('div')
+      grid.className = 'mpr-grid'
+      for (const source of sources) grid.appendChild(sourceCard(source))
+      root.appendChild(grid)
+    } else {
+      const empty = document.createElement('div')
+      empty.className = 'mpr-empty'
+      empty.textContent = '暂未匹配到其他平台评分'
+      root.appendChild(empty)
     }
-    root.append(heading, grid)
+    const seasons = episodePanel(payload)
+    if (seasons) root.appendChild(seasons)
   }
 
   async function refresh() {
