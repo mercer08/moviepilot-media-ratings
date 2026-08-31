@@ -28,7 +28,7 @@ python3 adapters/reverse-proxy/build_index.py \
 ```bash
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/episodes?tmdb_id=93544&season=1'
-curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.2.0'
+curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.3.0'
 ```
 
 然后分别打开普通电视剧、动漫详情页及 390px 宽移动端页面，展开“季 / 单集评分”，切换不同季，

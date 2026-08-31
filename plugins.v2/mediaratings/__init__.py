@@ -30,9 +30,9 @@ from .client import (
 
 class MediaRatings(_PluginBase):
     plugin_name = "详情页多源评分"
-    plugin_desc = "聚合作品、季与单集的 TMDB、IMDb、TVmaze、豆瓣评分；动漫追加 Bangumi。"
+    plugin_desc = "聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.2.0"
+    plugin_version = "1.3.0"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"
@@ -235,10 +235,7 @@ class MediaRatings(_PluginBase):
                 f"https://www.themoviedb.org/{media_type}/{tmdb_id}",
             )
 
-        tasks = [
-            self._tvmaze(imdb_id, foreign_title),
-            self._douban(tmdb_id, mtype),
-        ]
+        tasks = [self._douban(tmdb_id, mtype)]
         is_anime = self._is_anime(tmdb)
         if is_anime:
             tasks.append(self._bangumi([original_title, resolved_title, title], resolved_year))
@@ -246,8 +243,6 @@ class MediaRatings(_PluginBase):
         for item in results:
             if isinstance(item, dict) and item.get("id") and item.get("score") is not None:
                 sources[item["id"]] = item
-                if not imdb_id and item.get("external_imdb_id"):
-                    imdb_id = str(item["external_imdb_id"])
 
         imdb_source = await self._imdb(
             imdb_id, foreign_title, resolved_year, media_type
@@ -294,7 +289,7 @@ class MediaRatings(_PluginBase):
                 logger.warning(f"MediaRatings OMDb lookup failed for {imdb_id}: {error}")
 
         order = [
-            "tmdb", "imdb", "tvmaze", "rotten_tomatoes", "metacritic", "douban", "bangumi"
+            "tmdb", "imdb", "rotten_tomatoes", "metacritic", "douban", "bangumi"
         ]
         return {
             "tmdb_id": tmdb_id,
@@ -307,7 +302,7 @@ class MediaRatings(_PluginBase):
         }
 
     async def _collect_episodes(self, tmdb_id: int, season: int) -> Dict[str, Any]:
-        """Use TMDB episodes as anchors, then merge IMDb and TVmaze by date/title."""
+        """Use TMDB episodes as anchors, then merge IMDb by date/title."""
 
         try:
             tmdb = await self._tmdb.async_get_info(
@@ -328,16 +323,9 @@ class MediaRatings(_PluginBase):
         )
         external_ids = tmdb.get("external_ids") or {}
         imdb_id = str(tmdb.get("imdb_id") or external_ids.get("imdb_id") or "").strip()
-        original_title = str(
-            tmdb.get("original_title") or tmdb.get("original_name") or tmdb.get("name") or ""
-        ).strip()
-
-        imdb_matches, tvmaze_matches = await asyncio.gather(
-            self._imdb_episode_matches(imdb_id, anchors, season),
-            self._tvmaze_episode_matches(imdb_id, original_title, anchors),
-        )
+        imdb_matches = await self._imdb_episode_matches(imdb_id, anchors, season)
         source_rows: Dict[str, List[Dict[str, Any]]] = {
-            "tmdb": [], "imdb": [], "tvmaze": []
+            "tmdb": [], "imdb": []
         }
         episodes: List[Dict[str, Any]] = []
         for anchor in anchors:
@@ -368,16 +356,6 @@ class MediaRatings(_PluginBase):
                 row_sources.append(item)
                 source_rows["imdb"].append(item)
 
-            tvmaze = tvmaze_matches.get(number)
-            tvmaze_score = normalize_score(((tvmaze or {}).get("rating") or {}).get("average"))
-            if tvmaze_score is not None:
-                item = self._source(
-                    "tvmaze", "TVmaze", tvmaze_score, None,
-                    str((tvmaze or {}).get("url") or "https://www.tvmaze.com/"),
-                )
-                row_sources.append(item)
-                source_rows["tvmaze"].append(item)
-
             episodes.append({
                 "season": season,
                 "episode": number,
@@ -390,9 +368,8 @@ class MediaRatings(_PluginBase):
         source_meta = {
             "tmdb": ("TMDB", f"https://www.themoviedb.org/tv/{tmdb_id}/season/{season}"),
             "imdb": ("IMDb", f"https://www.imdb.com/title/{imdb_id}/episodes/"),
-            "tvmaze": ("TVmaze", "https://www.tvmaze.com/"),
         }
-        for source_id in ("tmdb", "imdb", "tvmaze"):
+        for source_id in ("tmdb", "imdb"):
             name, url = source_meta[source_id]
             aggregate = aggregate_episode_source(
                 source_id, name, source_rows[source_id], url
@@ -444,36 +421,6 @@ class MediaRatings(_PluginBase):
             return match_episode_candidates(anchors, candidates)
         except Exception as error:
             logger.info(f"MediaRatings IMDb episode lookup unavailable for {imdb_id}: {error}")
-            return {}
-
-    async def _tvmaze_episode_matches(
-        self, imdb_id: str, title: str, anchors: List[Dict[str, Any]]
-    ) -> Dict[int, Dict[str, Any]]:
-        """Fetch a TVmaze episode list and align it to TMDB anchors."""
-
-        if not anchors:
-            return {}
-        try:
-            client = AsyncRequestUtils(timeout=10)
-            if imdb_id:
-                show = await client.get_json(
-                    "https://api.tvmaze.com/lookup/shows", params={"imdb": imdb_id}
-                )
-            elif title:
-                show = await client.get_json(
-                    "https://api.tvmaze.com/singlesearch/shows", params={"q": title}
-                )
-            else:
-                return {}
-            show_id = (show or {}).get("id")
-            if not show_id:
-                return {}
-            candidates = await client.get_json(
-                f"https://api.tvmaze.com/shows/{show_id}/episodes"
-            ) or []
-            return match_episode_candidates(anchors, candidates)
-        except Exception as error:
-            logger.info(f"MediaRatings TVmaze episode lookup unavailable: {error}")
             return {}
 
     async def _imdb(
@@ -534,32 +481,6 @@ class MediaRatings(_PluginBase):
             return source
         except Exception as error:
             logger.warning(f"MediaRatings IMDb lookup failed for {imdb_id}: {error}")
-            return None
-
-    async def _tvmaze(self, imdb_id: str, title: str) -> Optional[Dict[str, Any]]:
-        try:
-            if imdb_id:
-                data = await AsyncRequestUtils(timeout=8).get_json(
-                    "https://api.tvmaze.com/lookup/shows", params={"imdb": imdb_id}
-                )
-            elif title:
-                data = await AsyncRequestUtils(timeout=8).get_json(
-                    "https://api.tvmaze.com/singlesearch/shows", params={"q": title}
-                )
-            else:
-                return None
-            score = normalize_score((data or {}).get("rating", {}).get("average"))
-            if score is None:
-                return None
-            source = self._source(
-                "tvmaze", "TVmaze", score, None,
-                str((data or {}).get("url") or "https://www.tvmaze.com/"),
-            )
-            source["external_imdb_id"] = str(
-                ((data or {}).get("externals") or {}).get("imdb") or ""
-            )
-            return source
-        except Exception:
             return None
 
     async def _douban(self, tmdb_id: int, mtype: MediaType) -> Optional[Dict[str, Any]]:

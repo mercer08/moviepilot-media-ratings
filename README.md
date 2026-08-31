@@ -1,7 +1,7 @@
 # MoviePilot 详情页多源评分
 
-为 MoviePilot V2 聚合 TMDB、IMDb、TVmaze、豆瓣等主流评分；识别为动漫时追加 Bangumi，
-配置 OMDb API Key 后还可显示 Rotten Tomatoes 与 Metacritic。
+为 MoviePilot V2 聚合 TMDB、IMDb、Rotten Tomatoes、Metacritic 与豆瓣评分；识别为动漫时
+追加 Bangumi。Rotten Tomatoes 与 Metacritic 数据通过用户自己的 OMDb API Key 获取。
 
 ![MoviePilot V2](https://img.shields.io/badge/MoviePilot-2.15.1%2B-7c3aed)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -10,7 +10,7 @@
 
 - 以 TMDB ID 为稳定主键，结合原始标题、年份和媒体类型消除同名误匹配
 - 电视剧支持季汇总分与逐集评分，展开后按需加载，不拖慢作品详情首屏
-- 不强行按季号对齐：通过单集标题、首播日期和集号匹配 IMDb / TVmaze，兼容续作季号差异
+- 不强行按季号对齐：通过单集标题、首播日期和集号匹配 IMDb，兼容续作季号差异
 - 并行读取多个公开数据源，统一为 `0–10` 分制
 - 返回投票人数和可点击的来源链接
 - 日语动画自动追加 Bangumi，普通影视不发起 Bangumi 请求
@@ -54,14 +54,16 @@ MoviePilot V2 的标准插件合同可以注册 API、配置页、插件数据�
 ## 实现方式
 
 请求进入插件后，先通过 MoviePilot 的 TMDB 模块解析标准标题、原始标题、年份、IMDb ID、
-TVDB ID、语言、国家和类型。随后并行查询 TVmaze、豆瓣和（仅动漫）Bangumi，再查询 IMDb；
-配置 OMDb 时补充影评聚合站评分。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
+TVDB ID、语言、国家和类型。随后并行查询豆瓣和（仅动漫）Bangumi，再查询 IMDb；配置
+OMDb 时补充 Rotten Tomatoes 与 Metacritic。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
 低置信度结果直接丢弃，避免“有分但作品错了”。
 
-季与单集接口以 TMDB 的单集清单为锚点，再把 IMDb 和 TVmaze 的候选集按标题、完整首播日期及
+季与单集接口以 TMDB 的单集清单为锚点，再把 IMDb 候选集按标题、完整首播日期及
 集号评分匹配。匹配过程不把季号当作唯一依据，例如 2019 版《上层男孩》在 TMDB 的第 1 季可
 正确对应 IMDb 延续旧版编号后的第 3 季。季评分由已匹配的单集评分汇总；有投票数的平台使用
 投票数加权平均，否则使用算术平均，并在返回中给出实际参与汇总的集数。
+Rotten Tomatoes 与 Metacritic 通常只提供整部作品或整季层面的媒体评分，没有稳定的公开逐集
+评分，所以逐集结果仅展示 TMDB 与 IMDb，避免用不可靠数据填充。
 
 返回示例：
 

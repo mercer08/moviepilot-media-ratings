@@ -36,7 +36,6 @@
       #${ROOT_ID} .mpr-source-bangumi .mpr-score{background:conic-gradient(#f09199 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-source-rotten_tomatoes .mpr-score{background:conic-gradient(#fa320a calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-source-metacritic .mpr-score{background:conic-gradient(#ffcc34 calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
-      #${ROOT_ID} .mpr-source-tvmaze .mpr-score{background:conic-gradient(#3c948b calc(var(--score)*10%),rgba(255,255,255,.12) 0)}
       #${ROOT_ID} .mpr-loading,#${ROOT_ID} .mpr-empty{padding:.8rem 1rem;border:1px dashed rgba(255,255,255,.18);border-radius:12px;color:rgba(255,255,255,.62);font-size:.82rem}
       #${ROOT_ID} .mpr-seasons{margin-top:.8rem;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:rgba(22,25,31,.48);overflow:hidden}
       #${ROOT_ID} .mpr-seasons summary{display:flex;align-items:center;gap:.5rem;padding:.8rem .9rem;cursor:pointer;font-size:.86rem;font-weight:650;list-style:none}
@@ -202,7 +201,7 @@
       const season = Number(select.value)
       if (!Number.isInteger(season) || loadedSeason === season) return
       const serial = ++loadSerial
-      status.textContent = '正在匹配 IMDb、TMDB 与 TVmaze…'
+      status.textContent = '正在匹配 IMDb 与 TMDB…'
       result.innerHTML = '<div class="mpr-loading">正在加载季与单集评分…</div>'
       try {
         const query = new URLSearchParams({ tmdb_id: payload.tmdb_id, season })
