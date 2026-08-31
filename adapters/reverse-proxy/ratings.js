@@ -68,8 +68,17 @@
     document.head.appendChild(style)
   }
 
+  function cardLookupTitle(value) {
+    const title = String(value || '').normalize('NFKC').trim()
+    const stripped = title.replace(
+      /\s*(?:第\s*[零〇一二三四五六七八九十百两0-9]+\s*季|season\s*[0-9]+|s[0-9]{1,3})\s*$/i,
+      '',
+    ).trim()
+    return stripped || title
+  }
+
   function cardMeta(card) {
-    const title = card.querySelector('.media-card-title')?.textContent?.trim() || ''
+    const title = cardLookupTitle(card.querySelector('.media-card-title')?.textContent)
     if (!title) return null
     const typeLabels = [...card.querySelectorAll('.v-chip__content')]
       .map(node => node.textContent?.trim().toLowerCase() || '')
@@ -227,6 +236,7 @@
       year: params.get('year') || '',
     }
     if (match) result.tmdb_id = match[1]
+    if (!result.tmdb_id) result.title = cardLookupTitle(result.title)
     if (!result.tmdb_id && !result.title) return null
     return result
   }

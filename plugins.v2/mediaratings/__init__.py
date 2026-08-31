@@ -19,6 +19,7 @@ from app.utils.http import AsyncRequestUtils
 
 from .client import (
     aggregate_episode_source,
+    card_lookup_title,
     match_episode_candidates,
     normalize_score,
     normalize_votes,
@@ -33,7 +34,7 @@ class MediaRatings(_PluginBase):
     plugin_name = "全站多源评分"
     plugin_desc = "在详情页、推荐与榜单卡片聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.5.1"
+    plugin_version = "1.5.2"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"
@@ -224,8 +225,9 @@ class MediaRatings(_PluginBase):
         """Resolve list-card metadata to TMDB once, then reuse detail caches."""
 
         normalized_type = "movie" if str(media_type).lower() in {"movie", "电影"} else "tv"
+        lookup_title = card_lookup_title(title)
         lookup_key = (
-            f"card:v1:{normalized_type}:{normalized_title(title)}:{year or ''}"
+            f"card:v2:{normalized_type}:{normalized_title(lookup_title)}:{year or ''}"
         )
         cached = self._memory_cache.get(lookup_key) or self.get_data(lookup_key)
         if self._fresh(cached):
@@ -249,10 +251,18 @@ class MediaRatings(_PluginBase):
             mtype = MediaType.MOVIE if normalized_type == "movie" else MediaType.TV
             try:
                 matched = await self._tmdb.async_match(
-                    name=title,
+                    name=lookup_title,
                     mtype=mtype,
                     year=str(year) if year else None,
                 ) or {}
+                if not matched and normalized_type == "tv" and year:
+                    # Douban season pages expose the season year, while TMDB
+                    # searches TV records by the series' original first-air year.
+                    matched = await self._tmdb.async_match(
+                        name=lookup_title,
+                        mtype=mtype,
+                        year=None,
+                    ) or {}
                 tmdb_id = int(matched.get("id") or 0)
             except Exception as error:
                 logger.info(
@@ -264,7 +274,7 @@ class MediaRatings(_PluginBase):
                 result = await self.detail(
                     tmdb_id=tmdb_id,
                     media_type=normalized_type,
-                    title=title,
+                    title=lookup_title,
                     year=year,
                 )
             else:

@@ -30,7 +30,7 @@ python3 adapters/reverse-proxy/build_index.py \
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/episodes?tmdb_id=93544&season=1'
 curl -fsS 'https://YOUR_HOST/moviepilot-ratings/api/card?title=Top%20Boy&media_type=tv&year=2019'
-curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.5.1'
+curl -fsS 'https://YOUR_HOST/' | grep -F '/moviepilot-ratings/ratings.js?v=1.5.2'
 ```
 
 然后分别打开电影、普通电视剧、动漫详情页、推荐页、搜索结果与豆瓣/IMDb/MAL 榜单，并在

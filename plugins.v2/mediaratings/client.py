@@ -48,6 +48,18 @@ def normalized_title(value: Any) -> str:
     return re.sub(r"[^\w\u3040-\u30ff\u3400-\u9fff]+", "", text)
 
 
+def card_lookup_title(value: Any) -> str:
+    """Remove an explicit trailing season label without changing real titles."""
+
+    title = unicodedata.normalize("NFKC", str(value or "")).strip()
+    season_suffix = re.compile(
+        r"\s*(?:第\s*[零〇一二三四五六七八九十百两0-9]+\s*季|season\s*[0-9]+|s[0-9]{1,3})\s*$",
+        re.IGNORECASE,
+    )
+    stripped = season_suffix.sub("", title).strip()
+    return stripped or title
+
+
 def year_from_date(value: Any) -> Optional[int]:
     match = re.search(r"\b(19|20)\d{2}\b", str(value or ""))
     return int(match.group(0)) if match else None

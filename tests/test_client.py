@@ -13,6 +13,12 @@ SPEC.loader.exec_module(CLIENT)
 
 
 class MediaRatingsClientTest(unittest.TestCase):
+    def test_card_lookup_title_removes_only_trailing_season_labels(self):
+        self.assertEqual(CLIENT.card_lookup_title("证言 第一季"), "证言")
+        self.assertEqual(CLIENT.card_lookup_title("绝望写手 第五季"), "绝望写手")
+        self.assertEqual(CLIENT.card_lookup_title("The Testaments Season 1"), "The Testaments")
+        self.assertEqual(CLIENT.card_lookup_title("S.W.A.T."), "S.W.A.T.")
+
     def test_normalize_score_accepts_ten_and_hundred_point_scales(self):
         self.assertEqual(CLIENT.normalize_score("8.4"), 8.4)
         self.assertEqual(CLIENT.normalize_score("84/100"), 8.4)
