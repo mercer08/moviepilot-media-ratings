@@ -1,11 +1,11 @@
 # Architecture
 
 ```text
-MoviePilot media page
+MoviePilot detail page / list card
         │
         │ optional reverse-proxy adapter
         ▼
-MediaRatings /detail API
+MediaRatings /detail or /card API
         │
         ├── MoviePilot TMDB module ── stable identity and base score
         ├── MoviePilot Douban chain ─ domestic score
@@ -19,4 +19,4 @@ helpers so they can be tested without importing the MoviePilot runtime. Only suc
 cached; cache records contain public title and rating metadata, never user credentials or library data.
 
 The reverse-proxy adapter is deliberately outside the plugin directory because MoviePilot V2 has no supported
-media-detail extension point. This prevents marketplace upgrades from overwriting the host frontend.
+media-detail or list-card extension point. This prevents marketplace upgrades from overwriting the host frontend.

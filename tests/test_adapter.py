@@ -13,10 +13,18 @@ SPEC.loader.exec_module(BUILD)
 class AdapterBuilderTest(unittest.TestCase):
     def test_injects_versioned_script_and_dedicated_api_path(self):
         output = BUILD.inject("<!doctype html><html><head></head><body></body></html>")
-        self.assertIn('/moviepilot-ratings/ratings.js?v=1.4.0', output)
+        self.assertIn('/moviepilot-ratings/ratings.js?v=1.5.0', output)
         self.assertIn('data-api="/moviepilot-ratings/api/detail"', output)
         self.assertIn('data-episodes-api="/moviepilot-ratings/api/episodes"', output)
-        self.assertIn("['电影', 'movie', 'film']", (BUILD_PATH.parent / "ratings.js").read_text())
+        self.assertIn('data-card-api="/moviepilot-ratings/api/card"', output)
+        script = (BUILD_PATH.parent / "ratings.js").read_text()
+        self.assertIn("['电影', 'movie', 'film']", script)
+        self.assertIn("const CARD_SELECTOR = '.media-card'", script)
+        self.assertIn("new IntersectionObserver", script)
+        self.assertIn("CARD_CONCURRENCY = 2", script)
+        plugin = (BUILD_PATH.parents[2] / "plugins.v2/mediaratings/__init__.py").read_text()
+        self.assertIn('"path": "/card"', plugin)
+        self.assertIn("asyncio.Semaphore(3)", plugin)
         self.assertLess(output.index("ratings.js"), output.index("</head>"))
 
     def test_rejects_duplicate_injection(self):

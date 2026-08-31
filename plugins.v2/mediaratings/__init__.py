@@ -1,4 +1,4 @@
-"""Add cached multi-source ratings to MoviePilot media detail pages."""
+"""Add cached multi-source ratings to MoviePilot media pages and list cards."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from .client import (
     match_episode_candidates,
     normalize_score,
     normalize_votes,
+    normalized_title,
     omdb_ratings,
     select_bangumi_subject,
     select_imdb_title,
@@ -29,10 +30,10 @@ from .client import (
 
 
 class MediaRatings(_PluginBase):
-    plugin_name = "详情页多源评分"
-    plugin_desc = "聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
+    plugin_name = "全站多源评分"
+    plugin_desc = "在详情页、推荐与榜单卡片聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.4.0"
+    plugin_version = "1.5.0"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"
@@ -48,6 +49,7 @@ class MediaRatings(_PluginBase):
         self._tmdb = TmdbApi()
         self._media_chain = MediaChain()
         self._memory_cache: Dict[str, Dict[str, Any]] = {}
+        self._card_lookup_semaphore = asyncio.Semaphore(3)
 
     def init_plugin(self, config: dict = None) -> None:
         config = config or {}
@@ -81,6 +83,13 @@ class MediaRatings(_PluginBase):
                 "endpoint": self.episodes,
                 "methods": ["GET"],
                 "summary": "获取指定季及单集的多源评分",
+                "allow_anonymous": True,
+            },
+            {
+                "path": "/card",
+                "endpoint": self.card,
+                "methods": ["GET"],
+                "summary": "按标题、年份和类型获取榜单卡片多源评分",
                 "allow_anonymous": True,
             },
         ]
@@ -147,7 +156,7 @@ class MediaRatings(_PluginBase):
                         "props": {
                             "type": "info",
                             "variant": "tonal",
-                            "text": "MoviePilot V2 暂无原生媒体详情页插件插槽；评分卡需要仓库中可选的反向代理适配器。",
+                            "text": "MoviePilot V2 暂无原生媒体页面插件插槽；详情页与榜单卡片评分需要仓库中可选的反向代理适配器。",
                         },
                     },
                 ],
@@ -204,6 +213,70 @@ class MediaRatings(_PluginBase):
         if result.get("episodes"):
             self._memory_cache[cache_key] = result
             self.save_data(cache_key, result)
+        return result
+
+    async def card(
+        self,
+        title: str = Query(..., min_length=1, max_length=200),
+        media_type: str = Query("tv"),
+        year: Optional[int] = Query(None, ge=1800, le=2200),
+    ) -> Dict[str, Any]:
+        """Resolve list-card metadata to TMDB once, then reuse detail caches."""
+
+        normalized_type = "movie" if str(media_type).lower() in {"movie", "电影"} else "tv"
+        lookup_key = (
+            f"card:v1:{normalized_type}:{normalized_title(title)}:{year or ''}"
+        )
+        cached = self._memory_cache.get(lookup_key) or self.get_data(lookup_key)
+        if self._fresh(cached):
+            self._memory_cache[lookup_key] = cached
+            return cached
+        if not self._enabled:
+            return {
+                "title": title,
+                "media_type": normalized_type,
+                "sources": [],
+                "message": "plugin disabled",
+            }
+
+        async with self._card_lookup_semaphore:
+            # Another request for the same card may have populated the cache
+            # while this request waited for a lookup slot.
+            cached = self._memory_cache.get(lookup_key) or self.get_data(lookup_key)
+            if self._fresh(cached):
+                self._memory_cache[lookup_key] = cached
+                return cached
+            mtype = MediaType.MOVIE if normalized_type == "movie" else MediaType.TV
+            try:
+                matched = await self._tmdb.async_match(
+                    name=title,
+                    mtype=mtype,
+                    year=str(year) if year else None,
+                ) or {}
+                tmdb_id = int(matched.get("id") or 0)
+            except Exception as error:
+                logger.info(
+                    f"MediaRatings card lookup unavailable for {title} ({year or '-'}): {error}"
+                )
+                tmdb_id = 0
+
+            if tmdb_id:
+                result = await self.detail(
+                    tmdb_id=tmdb_id,
+                    media_type=normalized_type,
+                    title=title,
+                    year=year,
+                )
+            else:
+                result = {
+                    "tmdb_id": None,
+                    "media_type": normalized_type,
+                    "title": title,
+                    "fetched_at": int(time.time()),
+                    "sources": [],
+                }
+        self._memory_cache[lookup_key] = result
+        self.save_data(lookup_key, result)
         return result
 
     async def _collect(

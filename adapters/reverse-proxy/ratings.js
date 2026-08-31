@@ -4,9 +4,15 @@
   const loader = document.currentScript
   const API = loader?.dataset.api || '/api/v1/plugin/MediaRatings/detail'
   const EPISODE_API = loader?.dataset.episodesApi || API.replace(/\/detail$/, '/episodes')
+  const CARD_API = loader?.dataset.cardApi || API.replace(/\/detail$/, '/card')
   const ROOT_ID = 'moviepilot-multi-source-ratings'
+  const CARD_SELECTOR = '.media-card'
+  const CARD_CONCURRENCY = 2
   let requestSerial = 0
   let lastKey = ''
+  let activeCardRequests = 0
+  const cardQueue = []
+  const cardResponses = new Map()
 
   const sourceClass = id => `mpr-source-${String(id || '').replace(/[^a-z0-9_-]/gi, '')}`
   const voteLabel = votes => {
@@ -53,9 +59,159 @@
       #${ROOT_ID} .mpr-episode-scores{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.32rem}
       #${ROOT_ID} .mpr-chip{padding:.2rem .42rem;border:1px solid rgba(var(--mpr-on-surface),.16);border-radius:999px;color:rgba(var(--mpr-on-surface),.9);font-size:.67rem;text-decoration:none}
       #${ROOT_ID} .mpr-chip:hover{border-color:rgba(var(--mpr-on-surface),.36)}
+      .mpr-card-ratings{position:absolute;z-index:5;left:.38rem;right:.38rem;bottom:.38rem;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.22rem;pointer-events:none}
+      .mpr-card-rating{display:inline-flex;align-items:center;justify-content:center;gap:.18rem;min-width:0;min-height:20px;padding:.12rem .2rem;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(12,15,20,.78);box-shadow:0 1px 4px rgba(0,0,0,.28);color:#fff;font-size:.6rem;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;backdrop-filter:blur(7px)}
+      .mpr-card-rating:before{content:'';width:.34rem;height:.34rem;border-radius:50%;background:#8b5cf6}
+      .mpr-card-rating[data-source="imdb"]:before{background:#f5c518}.mpr-card-rating[data-source="douban"]:before{background:#00b51d}.mpr-card-rating[data-source="bangumi"]:before{background:#f09199}.mpr-card-rating[data-source="rotten_tomatoes"]:before{background:#fa320a}.mpr-card-rating[data-source="metacritic"]:before{background:#ffcc34}
       @media (max-width:700px){#${ROOT_ID}{margin-top:.8rem}#${ROOT_ID} .mpr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#${ROOT_ID} .mpr-card{padding:.65rem;gap:.55rem}#${ROOT_ID} .mpr-score{flex-basis:39px;height:39px}#${ROOT_ID} .mpr-score:before{width:32px;height:32px}#${ROOT_ID} .mpr-episode{grid-template-columns:1fr;gap:.42rem}#${ROOT_ID} .mpr-episode-scores{justify-content:flex-start}}
     `
     document.head.appendChild(style)
+  }
+
+  function cardMeta(card) {
+    const title = card.querySelector('.media-card-title')?.textContent?.trim() || ''
+    if (!title) return null
+    const typeLabels = [...card.querySelectorAll('.v-chip__content')]
+      .map(node => node.textContent?.trim().toLowerCase() || '')
+    let mediaType = ''
+    if (typeLabels.some(value => ['电影', 'movie', 'film'].includes(value))) mediaType = 'movie'
+    if (typeLabels.some(value => ['电视剧', '剧集', '动漫', 'tv', 'series'].includes(value))) mediaType = 'tv'
+    if (!mediaType) return null
+    const yearText = card.querySelector('.v-card-text span')?.textContent || card.textContent || ''
+    const yearMatch = yearText.match(/\b(19|20)\d{2}\b/)
+    const year = yearMatch ? yearMatch[0] : ''
+    return { title, year, media_type: mediaType }
+  }
+
+  function cardKey(meta) {
+    return `${meta.media_type}:${meta.title}:${meta.year}`
+  }
+
+  function sourceShortName(source) {
+    return ({
+      imdb: 'IMDb', douban: '豆瓣', bangumi: 'BGM',
+      rotten_tomatoes: 'RT', metacritic: 'MC', tmdb: 'TMDB',
+    })[source.id] || source.name || source.id
+  }
+
+  function renderCardRatings(card, payload, key) {
+    if (!card.isConnected || card.dataset.mprCardKey !== key) return
+    card.querySelector('.mpr-card-ratings')?.remove()
+    const sourceOrder = ['imdb', 'douban', 'bangumi', 'rotten_tomatoes', 'metacritic', 'tmdb']
+    const sourcePriority = source => {
+      const index = sourceOrder.indexOf(source.id)
+      return index < 0 ? sourceOrder.length : index
+    }
+    const sources = (Array.isArray(payload?.sources) ? payload.sources : [])
+      .filter(source => source?.id && source?.score !== null && source?.score !== undefined)
+      .sort((left, right) => sourcePriority(left) - sourcePriority(right))
+    const external = sources.filter(source => source.id !== 'tmdb')
+    const visible = (external.length ? external : sources).slice(0, 4)
+    if (!visible.length) {
+      card.dataset.mprCardState = 'empty'
+      return
+    }
+    const group = document.createElement('div')
+    group.className = 'mpr-card-ratings'
+    group.setAttribute('aria-label', '多平台评分')
+    for (const source of visible) {
+      const chip = document.createElement('span')
+      chip.className = 'mpr-card-rating'
+      chip.dataset.source = source.id
+      chip.textContent = `${sourceShortName(source)} ${source.display || Number(source.score).toFixed(1)}`
+      chip.title = `${source.name || sourceShortName(source)}：${source.display || source.score}`
+      group.appendChild(chip)
+    }
+    card.appendChild(group)
+    card.dataset.mprCardState = 'loaded'
+  }
+
+  async function fetchCard(meta) {
+    const query = new URLSearchParams(meta)
+    if (!meta.year) query.delete('year')
+    const response = await fetch(`${CARD_API}?${query}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.json()
+  }
+
+  function drainCardQueue() {
+    while (activeCardRequests < CARD_CONCURRENCY && cardQueue.length) {
+      const task = cardQueue.shift()
+      activeCardRequests += 1
+      fetchCard(task.meta)
+        .then(payload => {
+          task.resolve(payload)
+          document.querySelectorAll(CARD_SELECTOR).forEach(card => {
+            if (card.dataset.mprCardKey === task.key) renderCardRatings(card, payload, task.key)
+          })
+        })
+        .catch(error => {
+          cardResponses.delete(task.key)
+          task.reject(error)
+          console.info('[MediaRatings] card rating unavailable', task.meta.title, error)
+        })
+        .finally(() => {
+          activeCardRequests -= 1
+          drainCardQueue()
+        })
+    }
+  }
+
+  function requestCard(meta) {
+    const key = cardKey(meta)
+    if (!cardResponses.has(key)) {
+      cardResponses.set(key, new Promise((resolve, reject) => {
+        cardQueue.push({ key, meta, resolve, reject })
+        drainCardQueue()
+      }))
+    }
+    return cardResponses.get(key)
+  }
+
+  async function hydrateCard(card) {
+    const meta = cardMeta(card)
+    if (!meta) return
+    const key = cardKey(meta)
+    if (card.dataset.mprCardKey !== key) {
+      card.querySelector('.mpr-card-ratings')?.remove()
+      card.dataset.mprCardKey = key
+      card.dataset.mprCardState = ''
+    }
+    if (['loading', 'loaded', 'empty'].includes(card.dataset.mprCardState)) return
+    card.dataset.mprCardState = 'loading'
+    try {
+      const payload = await requestCard(meta)
+      renderCardRatings(card, payload, key)
+    } catch (_) {
+      if (card.dataset.mprCardKey === key) card.dataset.mprCardState = 'error'
+    }
+  }
+
+  const cardObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue
+      cardObserver.unobserve(entry.target)
+      hydrateCard(entry.target)
+    }
+  }, { rootMargin: '180px 0px' })
+
+  function scanCards() {
+    installStyle()
+    document.querySelectorAll(CARD_SELECTOR).forEach(card => {
+      const meta = cardMeta(card)
+      if (!meta) return
+      const key = cardKey(meta)
+      if (card.dataset.mprCardKey !== key) {
+        card.querySelector('.mpr-card-ratings')?.remove()
+        card.dataset.mprCardKey = key
+        card.dataset.mprCardState = ''
+      }
+      if (!['loading', 'loaded', 'empty'].includes(card.dataset.mprCardState)) {
+        cardObserver.observe(card)
+      }
+    })
   }
 
   function paramsFromHash() {
@@ -287,11 +443,22 @@
     }
   }
 
-  const observer = new MutationObserver(() => window.requestAnimationFrame(refresh))
-  observer.observe(document.documentElement, { childList: true, subtree: true })
+  let scanPending = false
+  const scheduleRefresh = () => {
+    if (scanPending) return
+    scanPending = true
+    window.requestAnimationFrame(() => {
+      scanPending = false
+      refresh()
+      scanCards()
+    })
+  }
+  const observer = new MutationObserver(scheduleRefresh)
+  observer.observe(document.documentElement, { childList: true, characterData: true, subtree: true })
   window.addEventListener('hashchange', () => {
     lastKey = ''
-    refresh()
+    scheduleRefresh()
   })
   refresh()
+  scanCards()
 })()

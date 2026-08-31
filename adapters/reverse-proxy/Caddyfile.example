@@ -11,6 +11,12 @@ moviepilot.example.com {
 		reverse_proxy moviepilot:3000
 	}
 
+	@card_ratings_api path /moviepilot-ratings/api/card
+	handle @card_ratings_api {
+		rewrite * /api/v1/plugin/MediaRatings/card
+		reverse_proxy moviepilot:3000
+	}
+
 	@ratings_assets path /moviepilot-ratings/*
 	handle @ratings_assets {
 		header Cache-Control "no-cache, max-age=0"

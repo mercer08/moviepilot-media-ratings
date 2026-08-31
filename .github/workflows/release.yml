@@ -27,5 +27,5 @@ jobs:
           release_version="${GITHUB_REF_NAME#MediaRatings_}"
           gh release create "$GITHUB_REF_NAME" \
             "mediaratings_${release_version}.zip" \
-            --title "详情页多源评分 ${release_version}" \
+            --title "全站多源评分 ${release_version}" \
             --generate-notes

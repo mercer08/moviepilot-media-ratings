@@ -1,4 +1,4 @@
-# MoviePilot 详情页多源评分
+# MoviePilot 全站多源评分
 
 为 MoviePilot V2 聚合 TMDB、IMDb、Rotten Tomatoes、Metacritic 与豆瓣评分；识别为动漫时
 追加 Bangumi。Rotten Tomatoes 与 Metacritic 数据通过用户自己的 OMDb API Key 获取。
@@ -18,6 +18,8 @@
 - 可选响应式评分卡：桌面自动分栏，窄屏固定两列，无横向溢出
 - 评分卡直接读取 MoviePilot/Vuetify 主题变量，白色与深色主题自动保持正确对比度
 - 电影与电视剧详情页共用稳定的 TMDB 主键，兼容中文及英文媒体类型参数
+- 推荐、探索、搜索结果及豆瓣/TMDB/IMDb/MAL 等榜单卡片按标题、年份与类型解析 TMDB 主键
+- 卡片进入可视区域后才加载，前端最多并发 2 个请求，同作品跨榜单复用缓存
 - 不需要数据库迁移，也不安装额外 Python 包
 
 ## 安装
@@ -30,7 +32,7 @@
    https://github.com/mercer08/moviepilot-media-ratings
    ```
 
-2. 刷新插件市场，安装“详情页多源评分”。
+2. 刷新插件市场，安装“全站多源评分”。
 3. 打开插件设置并启用。缓存默认 12 小时。
 4. 如需 Rotten Tomatoes 与 Metacritic，在设置中填写自己的 OMDb API Key。
 
@@ -39,15 +41,16 @@
 ```text
 GET /api/v1/plugin/MediaRatings/detail?tmdb_id=93544&media_type=tv&title=Top%20Boy&year=2019
 GET /api/v1/plugin/MediaRatings/episodes?tmdb_id=93544&season=1
+GET /api/v1/plugin/MediaRatings/card?title=Top%20Boy&media_type=tv&year=2019
 ```
 
-## 关于“详情页”显示
+## 关于页面显示
 
 MoviePilot V2 的标准插件合同可以注册 API、配置页、插件数据页、仪表盘和系统模块，但没有给
-原生媒体详情页提供前端扩展插槽。因此，本仓库把实现明确分成两层：
+原生媒体详情页和媒体列表卡片提供前端扩展插槽。因此，本仓库把实现明确分成两层：
 
 1. `plugins.v2/mediaratings/`：完全标准的市场插件，负责查询、匹配、归一化和缓存。
-2. `adapters/reverse-proxy/`：可选前端适配器，把评分卡插入原生详情页；它需要反向代理配合，
+2. `adapters/reverse-proxy/`：可选前端适配器，把评分插入详情页与推荐、探索、搜索、榜单卡片；它需要反向代理配合，
    不属于 MoviePilot 标准插件生命周期。
 
 这种边界是刻意保留的：插件安装和升级不会偷偷覆盖 MoviePilot 前端文件。需要与当前已验收
@@ -59,6 +62,10 @@ MoviePilot V2 的标准插件合同可以注册 API、配置页、插件数据�
 TVDB ID、语言、国家和类型。随后并行查询豆瓣和（仅动漫）Bangumi，再查询 IMDb；配置
 OMDb 时补充 Rotten Tomatoes 与 Metacritic。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
 低置信度结果直接丢弃，避免“有分但作品错了”。
+
+列表卡片没有公开 TMDB ID，适配器会读取卡片已经展示的标题、年份和媒体类型，通过 MoviePilot
+内置 TMDB 匹配器解析主键，再复用同一详情评分缓存。只处理接近可视区域的卡片，并限制并发，
+避免长榜单造成瞬时请求洪峰。
 
 季与单集接口以 TMDB 的单集清单为锚点，再把 IMDb 候选集按标题、完整首播日期及
 集号评分匹配。匹配过程不把季号当作唯一依据，例如 2019 版《上层男孩》在 TMDB 的第 1 季可

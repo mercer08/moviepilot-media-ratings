@@ -36,7 +36,11 @@
   <body>
     <main class="media-page">
       <div class="media-overview">电影简介</div>
+      <div class="media-card" style="position:relative;width:144px;height:216px;background:#596276">
+        <div class="v-card-text"><span>1999</span><h1 class="media-card-title">搏击俱乐部</h1></div>
+        <span class="v-chip absolute left-2 top-2"><span class="v-chip__content">电影</span></span>
+      </div>
     </main>
-    <script src="../adapters/reverse-proxy/ratings.js" data-api="/mock/detail"></script>
+    <script src="../adapters/reverse-proxy/ratings.js" data-api="/mock/detail" data-card-api="/mock/card"></script>
   </body>
 </html>

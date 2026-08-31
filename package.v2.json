@@ -1,15 +1,16 @@
 {
   "MediaRatings": {
-    "name": "详情页多源评分",
-    "description": "聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。",
-    "labels": "评分,详情页,IMDb,烂番茄,Metacritic,豆瓣,Bangumi",
-    "version": "1.4.0",
+    "name": "全站多源评分",
+    "description": "在详情页、推荐与榜单卡片聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。",
+    "labels": "评分,详情页,榜单,推荐,IMDb,烂番茄,Metacritic,豆瓣,Bangumi",
+    "version": "1.5.0",
     "icon": "https://cdn.jsdelivr.net/gh/Templarian/MaterialDesign-Webfont@master/svg/star-box-multiple-outline.svg",
     "author": "mercer08",
     "level": 1,
     "system_version": ">=2.15.1,<3",
     "release": true,
     "history": {
+      "v1.5.0": "新增推荐、探索、搜索与各类榜单媒体卡片评分；可视区域按需加载并限制并发",
       "v1.4.0": "适配 MoviePilot 白色主题，并增强中英文电影类型识别与电影详情页显示",
       "v1.3.0": "以 Rotten Tomatoes 与 Metacritic 替换 TVmaze；季和单集保留 TMDB 与 IMDb",
       "v1.2.0": "新增季平均分与单集评分，按首播日期和标题跨平台匹配，兼容不同季编号",
