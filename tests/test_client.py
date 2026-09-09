@@ -50,7 +50,7 @@ class MediaRatingsClientTest(unittest.TestCase):
         ], "Top Boy", 2019, "tv")
         self.assertEqual(result["id"], "tt-new")
 
-    def test_omdb_extracts_imdb_rotten_tomatoes_and_metacritic(self):
+    def test_omdb_keeps_imdb_and_rotten_tomatoes_excludes_metacritic(self):
         ratings = CLIENT.omdb_ratings({
             "Response": "True",
             "imdbRating": "8.2",
@@ -63,7 +63,7 @@ class MediaRatingsClientTest(unittest.TestCase):
         })
         self.assertEqual(ratings["imdb"], {"score": 8.2, "votes": 12345})
         self.assertEqual(ratings["rotten_tomatoes"]["score"], 9.1)
-        self.assertEqual(ratings["metacritic"]["score"], 7.7)
+        self.assertNotIn("metacritic", ratings)
 
     def test_matches_episode_by_airdate_when_imdb_season_number_differs(self):
         anchors = [
@@ -110,6 +110,18 @@ class MediaRatingsClientTest(unittest.TestCase):
         self.assertEqual(result["score"], 8.8)
         self.assertEqual(result["votes"], 400)
         self.assertEqual(result["episodes"], 2)
+
+class PublicRatingPolicyTest(unittest.TestCase):
+    def test_old_cache_loses_retired_scores_at_every_level(self):
+        old = {"tmdb_id": 42, "title": "Example", "sources": [
+            {"id": "tmdb", "score": 9.0}, {"id": "metacritic", "score": 7.7}, {"id": "imdb", "score": 8.2}],
+            "episodes": [{"episode": 1, "sources": [{"id": "tmdb", "score": 8.0}, {"id": "metacritic", "score": 8.1}]}]}
+        result = CLIENT.public_ratings(old)
+        self.assertEqual(result["tmdb_id"], 42)
+        self.assertEqual(result["sources"], [{"id": "imdb", "score": 8.2}])
+        self.assertEqual(result["episodes"][0]["sources"], [])
+        self.assertEqual(len(old["sources"]), 3)
+        self.assertEqual(len(old["episodes"][0]["sources"]), 2)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 
-VERSION = "1.5.2"
+VERSION = "1.6.2"
 TAG = (
     f'<script defer src="/moviepilot-ratings/ratings.js?v={VERSION}" '
     'data-api="/moviepilot-ratings/api/detail" '
@@ -31,7 +31,7 @@ def inject(html: str) -> str:
 def fetch(url: str) -> str:
     """Fetch the current upstream MoviePilot index without sending credentials."""
 
-    request = Request(url, headers={"User-Agent": "MoviePilot-MediaRatings-Adapter/1.5"})
+    request = Request(url, headers={"User-Agent": "MoviePilot-MediaRatings-Adapter/1.6"})
     with urlopen(request, timeout=20) as response:  # noqa: S310 - operator supplies the trusted upstream URL
         return response.read().decode("utf-8")
 

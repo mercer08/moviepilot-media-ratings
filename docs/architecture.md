@@ -7,11 +7,11 @@ MoviePilot detail page / list card
         ▼
 MediaRatings /detail or /card API
         │
-        ├── MoviePilot TMDB module ── stable identity and base score
+        ├── MoviePilot TMDB module ── stable identity and metadata only
         ├── MoviePilot Douban chain ─ domestic score
         ├── IMDb / ImdbSource ─────── international score
         ├── Bangumi ───────────────── anime-only score
-        └── OMDb ───────────────────── Rotten Tomatoes / Metacritic
+        └── OMDb ───────────────────── Rotten Tomatoes
 ```
 
 The plugin keeps the aggregation API independent from presentation. Matching and normalization live in pure

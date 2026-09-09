@@ -5,11 +5,11 @@ MoviePilot V2 插件后端。它按 TMDB 媒体身份并行聚合多平台评分
 
 ## 数据源
 
-- TMDB：MoviePilot 内建 TMDB 模块
+- TMDB：仅使用 MoviePilot 内建模块获取媒体身份与元数据，不展示其评分
 - IMDb：优先读取公开标题接口，失败时复用已启用的 `ImdbSource` 插件能力
 - 豆瓣：MoviePilot 内建豆瓣媒体链
 - Bangumi：仅对识别为日语动画的条目查询公开 API
-- Rotten Tomatoes / Metacritic：通过用户配置的 OMDb API Key 启用
+- Rotten Tomatoes：通过用户配置的 OMDb API Key 启用
 
 ## API
 
@@ -32,7 +32,7 @@ GET /api/v1/plugin/MediaRatings/episodes
 
 单集匹配以 TMDB 为锚点，综合标题、首播日期和集号查找 IMDb 候选，不要求不同平台
 使用相同季号。季分数只汇总成功匹配且有评分的单集，有投票数时采用投票数加权平均。
-Rotten Tomatoes 与 Metacritic 不提供稳定的公开逐集评分，因此不会出现在逐集结果中。
+Rotten Tomatoes 不提供稳定的公开逐集评分，因此不会出现在逐集结果中。
 
 MoviePilot V2 没有向市场插件开放原生媒体页面插槽。市场安装会提供评分聚合 API；如需把
 评分嵌入 MoviePilot 详情页、推荐页、探索页、搜索结果与各类榜单卡片，请参阅仓库根目录的

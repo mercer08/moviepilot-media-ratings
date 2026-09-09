@@ -1,4 +1,4 @@
-/* MoviePilot app-shell cache migration for the multi-source ratings UI v1.5.2. */
+/* MoviePilot app-shell cache migration for the multi-source ratings UI v1.6.2. */
 'use strict'
 
 self.addEventListener('install', () => self.skipWaiting())
@@ -18,7 +18,8 @@ self.addEventListener('activate', event => {
 })
 
 self.addEventListener('fetch', event => {
-  if (event.request.mode === 'navigate') {
+  const path = new URL(event.request.url).pathname
+  if (event.request.mode === 'navigate' || path.startsWith('/api/v1/') || path.startsWith('/moviepilot-ratings/')) {
     event.stopImmediatePropagation()
     event.respondWith(fetch(event.request))
   }

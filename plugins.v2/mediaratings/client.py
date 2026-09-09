@@ -152,7 +152,7 @@ def select_imdb_title(
 
 
 def omdb_ratings(payload: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """Extract IMDb, Rotten Tomatoes, and Metacritic values from OMDb."""
+    """Extract IMDb and Rotten Tomatoes values from OMDb."""
 
     if not payload or payload.get("Response") == "False":
         return {}
@@ -167,17 +167,6 @@ def omdb_ratings(payload: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
             score = normalize_score(raw_value, 100)
             if score is not None:
                 values["rotten_tomatoes"] = {"score": score, "display": str(raw_value)}
-        elif source == "Metacritic":
-            raw_score = str(raw_value or "").split("/", 1)[0]
-            score = normalize_score(raw_score, 100)
-            if score is not None:
-                values["metacritic"] = {"score": score, "display": str(raw_value)}
-    metascore = normalize_score(payload.get("Metascore"), 100)
-    if metascore is not None and "metacritic" not in values:
-        values["metacritic"] = {
-            "score": metascore,
-            "display": f"{int(metascore * 10)}/100",
-        }
     return values
 
 
@@ -282,3 +271,16 @@ def aggregate_episode_source(
         "episodes": len(scored),
         "url": url,
     }
+
+
+def public_ratings(payload):
+    """Remove retired ratings, including old caches, without altering identity metadata."""
+    if not isinstance(payload, dict):
+        return payload
+    result = dict(payload)
+    if "sources" in result:
+        result["sources"] = [dict(s) for s in result["sources"]
+                             if isinstance(s, dict) and s.get("id") not in {"tmdb", "metacritic"}]
+    if "episodes" in result:
+        result["episodes"] = [public_ratings(e) for e in result["episodes"]]
+    return result

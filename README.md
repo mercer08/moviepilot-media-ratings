@@ -1,10 +1,12 @@
 # MoviePilot 全站多源评分
 
-为 MoviePilot V2 聚合 TMDB、IMDb、Rotten Tomatoes、Metacritic 与豆瓣评分；识别为动漫时
-追加 Bangumi。Rotten Tomatoes 与 Metacritic 数据通过用户自己的 OMDb API Key 获取。
+为 MoviePilot V2 聚合 IMDb、Rotten Tomatoes 与豆瓣评分；识别为动漫时
+追加 Bangumi。Rotten Tomatoes 数据通过用户自己的 OMDb API Key 获取。
 
 ![MoviePilot V2](https://img.shields.io/badge/MoviePilot-2.15.1%2B-7c3aed)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+TMDB 仅用于作品身份、年份、季集与图片等元数据匹配；不展示它的作品、季或单集评分。Metacritic 已移除，旧缓存也遵循此规则。
 
 ## 功能
 
@@ -35,7 +37,7 @@
 
 2. 刷新插件市场，安装“全站多源评分”。
 3. 打开插件设置并启用。缓存默认 12 小时。
-4. 如需 Rotten Tomatoes 与 Metacritic，在设置中填写自己的 OMDb API Key。
+4. 如需 Rotten Tomatoes，在设置中填写自己的 OMDb API Key。
 
 安装到这里即获得标准 MoviePilot 插件 API：
 
@@ -61,7 +63,7 @@ MoviePilot V2 的标准插件合同可以注册 API、配置页、插件数据�
 
 请求进入插件后，先通过 MoviePilot 的 TMDB 模块解析标准标题、原始标题、年份、IMDb ID、
 TVDB ID、语言、国家和类型。随后并行查询豆瓣和（仅动漫）Bangumi，再查询 IMDb；配置
-OMDb 时补充 Rotten Tomatoes 与 Metacritic。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
+OMDb 时补充 Rotten Tomatoes。候选匹配使用标题规范化、相似度、年份与媒体类型共同判定，
 低置信度结果直接丢弃，避免“有分但作品错了”。
 
 列表卡片没有公开 TMDB ID，适配器会读取卡片已经展示的标题、年份和媒体类型，通过 MoviePilot
@@ -72,8 +74,8 @@ OMDb 时补充 Rotten Tomatoes 与 Metacritic。候选匹配使用标题规范�
 集号评分匹配。匹配过程不把季号当作唯一依据，例如 2019 版《上层男孩》在 TMDB 的第 1 季可
 正确对应 IMDb 延续旧版编号后的第 3 季。季评分由已匹配的单集评分汇总；有投票数的平台使用
 投票数加权平均，否则使用算术平均，并在返回中给出实际参与汇总的集数。
-Rotten Tomatoes 与 Metacritic 通常只提供整部作品或整季层面的媒体评分，没有稳定的公开逐集
-评分，所以逐集结果仅展示 TMDB 与 IMDb，避免用不可靠数据填充。
+Rotten Tomatoes 通常只提供整部作品或整季层面的媒体评分，没有稳定的公开逐集
+评分，所以逐集结果仅展示 IMDb，避免用不可靠数据填充。
 
 返回示例：
 
@@ -83,7 +85,6 @@ Rotten Tomatoes 与 Metacritic 通常只提供整部作品或整季层面的媒�
   "media_type": "tv",
   "anime": false,
   "sources": [
-    {"id": "tmdb", "name": "TMDB", "score": 8.0, "votes": 162, "url": "..."},
     {"id": "imdb", "name": "IMDb", "score": 8.4, "votes": 50000, "url": "..."}
   ]
 }
@@ -104,7 +105,6 @@ Rotten Tomatoes 与 Metacritic 通常只提供整部作品或整季层面的媒�
       "episode": 1,
       "title": "Bruk Up",
       "sources": [
-        {"id": "tmdb", "name": "TMDB", "score": 7.8},
         {"id": "imdb", "name": "IMDb", "score": 7.8}
       ]
     }

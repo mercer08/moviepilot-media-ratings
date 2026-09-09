@@ -14,6 +14,9 @@
   const cardQueue = []
   const cardResponses = new Map()
 
+  // Filter again at the view boundary: browser/server caches may predate this policy.
+  const visibleSources = sources => (Array.isArray(sources) ? sources : []).filter(s => s && !['tmdb', 'metacritic'].includes(s.id))
+
   const sourceClass = id => `mpr-source-${String(id || '').replace(/[^a-z0-9_-]/gi, '')}`
   const voteLabel = votes => {
     if (votes === null || votes === undefined) return ''
@@ -25,6 +28,11 @@
     const style = document.createElement('style')
     style.id = 'moviepilot-ratings-style'
     style.textContent = `
+      /* The native numeric badge belongs to the source logo, not our rating chips. */
+      .media-card:has(.v-avatar img[src*="/assets/tmdb-"]) > .v-chip.absolute.right-2.top-2{display:none!important}
+      .media-card[data-mpr-native-source="tmdb"] > .v-chip.absolute.right-2.top-2{display:none!important}
+      .media-overview:has(.media-overview-left a[href^="https://www.themoviedb.org/"]) .media-overview-right .media-ratings:has(.v-rating--readonly){display:none!important}
+      .mpr-source-tmdb,.mpr-card-rating[data-source="tmdb"]{display:none!important}
       #${ROOT_ID}{--mpr-on-surface:var(--v-theme-on-surface,255,255,255);--mpr-surface:var(--v-theme-surface,32,36,44);margin:1rem 0 .25rem;grid-column:1/-1;color:rgb(var(--mpr-on-surface))}
       #${ROOT_ID} .mpr-heading{display:flex;align-items:center;gap:.5rem;margin:0 0 .7rem;font-size:1rem;font-weight:650;color:rgba(var(--mpr-on-surface),.92)}
       #${ROOT_ID} .mpr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:.65rem}
@@ -41,7 +49,6 @@
       #${ROOT_ID} .mpr-source-douban .mpr-score{background:conic-gradient(#00b51d calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
       #${ROOT_ID} .mpr-source-bangumi .mpr-score{background:conic-gradient(#f09199 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
       #${ROOT_ID} .mpr-source-rotten_tomatoes .mpr-score{background:conic-gradient(#fa320a calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
-      #${ROOT_ID} .mpr-source-metacritic .mpr-score{background:conic-gradient(#ffcc34 calc(var(--score)*10%),rgba(var(--mpr-on-surface),.12) 0)}
       #${ROOT_ID} .mpr-loading,#${ROOT_ID} .mpr-empty{padding:.8rem 1rem;border:1px dashed rgba(var(--mpr-on-surface),.2);border-radius:12px;color:rgba(var(--mpr-on-surface),.66);font-size:.82rem}
       #${ROOT_ID} .mpr-seasons{margin-top:.8rem;border:1px solid rgba(var(--mpr-on-surface),.14);border-radius:13px;background:rgba(var(--mpr-surface),.58);overflow:hidden}
       #${ROOT_ID} .mpr-seasons summary{display:flex;align-items:center;gap:.5rem;padding:.8rem .9rem;cursor:pointer;font-size:.86rem;font-weight:650;list-style:none}
@@ -62,7 +69,7 @@
       .mpr-card-ratings{position:absolute;z-index:5;left:.38rem;right:.38rem;bottom:.38rem;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.22rem;pointer-events:none}
       .mpr-card-rating{display:inline-flex;align-items:center;justify-content:center;gap:.18rem;min-width:0;min-height:20px;padding:.12rem .2rem;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(12,15,20,.78);box-shadow:0 1px 4px rgba(0,0,0,.28);color:#fff;font-size:.6rem;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;backdrop-filter:blur(7px)}
       .mpr-card-rating:before{content:'';width:.34rem;height:.34rem;border-radius:50%;background:#8b5cf6}
-      .mpr-card-rating[data-source="imdb"]:before{background:#f5c518}.mpr-card-rating[data-source="douban"]:before{background:#00b51d}.mpr-card-rating[data-source="bangumi"]:before{background:#f09199}.mpr-card-rating[data-source="rotten_tomatoes"]:before{background:#fa320a}.mpr-card-rating[data-source="metacritic"]:before{background:#ffcc34}
+      .mpr-card-rating[data-source="imdb"]:before{background:#f5c518}.mpr-card-rating[data-source="douban"]:before{background:#00b51d}.mpr-card-rating[data-source="bangumi"]:before{background:#f09199}.mpr-card-rating[data-source="rotten_tomatoes"]:before{background:#fa320a}
       @media (max-width:700px){#${ROOT_ID}{margin-top:.8rem}#${ROOT_ID} .mpr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#${ROOT_ID} .mpr-card{padding:.65rem;gap:.55rem}#${ROOT_ID} .mpr-score{flex-basis:39px;height:39px}#${ROOT_ID} .mpr-score:before{width:32px;height:32px}#${ROOT_ID} .mpr-episode{grid-template-columns:1fr;gap:.42rem}#${ROOT_ID} .mpr-episode-scores{justify-content:flex-start}}
     `
     document.head.appendChild(style)
@@ -99,23 +106,23 @@
   function sourceShortName(source) {
     return ({
       imdb: 'IMDb', douban: '豆瓣', bangumi: 'BGM',
-      rotten_tomatoes: 'RT', metacritic: 'MC', tmdb: 'TMDB',
+      rotten_tomatoes: 'RT',
     })[source.id] || source.name || source.id
   }
 
   function renderCardRatings(card, payload, key) {
     if (!card.isConnected || card.dataset.mprCardKey !== key) return
     card.querySelector('.mpr-card-ratings')?.remove()
-    const sourceOrder = ['imdb', 'douban', 'bangumi', 'rotten_tomatoes', 'metacritic', 'tmdb']
+    const sourceOrder = ['imdb', 'douban', 'bangumi', 'rotten_tomatoes']
     const sourcePriority = source => {
       const index = sourceOrder.indexOf(source.id)
       return index < 0 ? sourceOrder.length : index
     }
-    const sources = (Array.isArray(payload?.sources) ? payload.sources : [])
+    const sources = visibleSources(payload?.sources)
       .filter(source => source?.id && source?.score !== null && source?.score !== undefined)
       .sort((left, right) => sourcePriority(left) - sourcePriority(right))
     const external = sources.filter(source => source.id !== 'tmdb')
-    const visible = (external.length ? external : sources).slice(0, 4)
+    const visible = external.slice(0, 4)
     if (!visible.length) {
       card.dataset.mprCardState = 'empty'
       return
@@ -212,6 +219,15 @@
       const meta = cardMeta(card)
       if (!meta) return
       const key = cardKey(meta)
+      if (card.dataset.mprNativeSourceKey !== key) {
+        delete card.dataset.mprNativeSource
+        card.dataset.mprNativeSourceKey = key
+      }
+      const sourceLogo = card.querySelector('.v-avatar img')
+      if (sourceLogo) {
+        card.dataset.mprNativeSource = /\/assets\/tmdb-/.test(sourceLogo.getAttribute('src') || '') ? 'tmdb' : 'other'
+      }
+      // The source logo disappears on hover; retain its observed source for this identity.
       if (card.dataset.mprCardKey !== key) {
         card.querySelector('.mpr-card-ratings')?.remove()
         card.dataset.mprCardKey = key
@@ -285,7 +301,7 @@
 
   function renderSeasonResult(target, payload) {
     target.replaceChildren()
-    const sources = Array.isArray(payload?.sources) ? payload.sources : []
+    const sources = visibleSources(payload?.sources)
     if (sources.length) {
       const grid = document.createElement('div')
       grid.className = 'mpr-grid mpr-season-score'
@@ -316,7 +332,7 @@
       }
       const scores = document.createElement('div')
       scores.className = 'mpr-episode-scores'
-      for (const source of episode.sources || []) {
+      for (const source of visibleSources(episode.sources)) {
         const chip = document.createElement('a')
         chip.className = `mpr-chip ${sourceClass(source.id)}`
         chip.href = source.url || '#'
@@ -395,7 +411,7 @@
   }
 
   function render(root, payload) {
-    const sources = Array.isArray(payload?.sources) ? payload.sources : []
+    const sources = visibleSources(payload?.sources)
     root.replaceChildren()
     const heading = document.createElement('h2')
     heading.className = 'mpr-heading'

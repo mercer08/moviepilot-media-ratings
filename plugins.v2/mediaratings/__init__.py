@@ -19,6 +19,7 @@ from app.utils.http import AsyncRequestUtils
 
 from .client import (
     aggregate_episode_source,
+    public_ratings,
     card_lookup_title,
     match_episode_candidates,
     normalize_score,
@@ -32,9 +33,9 @@ from .client import (
 
 class MediaRatings(_PluginBase):
     plugin_name = "全站多源评分"
-    plugin_desc = "在详情页、推荐与榜单卡片聚合 TMDB、IMDb、烂番茄、Metacritic、豆瓣评分；动漫追加 Bangumi。"
+    plugin_desc = "在详情页、推荐与榜单卡片聚合 IMDb、烂番茄、豆瓣评分；动漫追加 Bangumi。"
     plugin_icon = "mdi-star-box-multiple-outline"
-    plugin_version = "1.5.2"
+    plugin_version = "1.6.2"
     plugin_author = "mercer08"
     author_url = "https://github.com/mercer08"
     plugin_config_prefix = "mediaratings_"
@@ -144,7 +145,7 @@ class MediaRatings(_PluginBase):
                                             "model": "omdb_api_key",
                                             "label": "OMDb API Key（可选）",
                                             "type": "password",
-                                            "hint": "配置后可追加 Rotten Tomatoes 与 Metacritic。",
+                                            "hint": "配置后可追加 Rotten Tomatoes。",
                                             "persistentHint": True,
                                         },
                                     }
@@ -188,13 +189,13 @@ class MediaRatings(_PluginBase):
         cached = self._memory_cache.get(cache_key) or self.get_data(cache_key)
         if self._fresh(cached):
             self._memory_cache[cache_key] = cached
-            return cached
+            return public_ratings(cached)
 
         result = await self._collect(tmdb_id, normalized_type, title, year)
         if result.get("sources"):
             self._memory_cache[cache_key] = result
             self.save_data(cache_key, result)
-        return result
+        return public_ratings(result)
 
     async def episodes(
         self,
@@ -209,12 +210,12 @@ class MediaRatings(_PluginBase):
         cached = self._memory_cache.get(cache_key) or self.get_data(cache_key)
         if self._fresh(cached):
             self._memory_cache[cache_key] = cached
-            return cached
+            return public_ratings(cached)
         result = await self._collect_episodes(tmdb_id, season)
         if result.get("episodes"):
             self._memory_cache[cache_key] = result
             self.save_data(cache_key, result)
-        return result
+        return public_ratings(result)
 
     async def card(
         self,
@@ -232,7 +233,7 @@ class MediaRatings(_PluginBase):
         cached = self._memory_cache.get(lookup_key) or self.get_data(lookup_key)
         if self._fresh(cached):
             self._memory_cache[lookup_key] = cached
-            return cached
+            return public_ratings(cached)
         if not self._enabled:
             return {
                 "title": title,
@@ -247,7 +248,7 @@ class MediaRatings(_PluginBase):
             cached = self._memory_cache.get(lookup_key) or self.get_data(lookup_key)
             if self._fresh(cached):
                 self._memory_cache[lookup_key] = cached
-                return cached
+                return public_ratings(cached)
             mtype = MediaType.MOVIE if normalized_type == "movie" else MediaType.TV
             try:
                 matched = await self._tmdb.async_match(
@@ -287,7 +288,7 @@ class MediaRatings(_PluginBase):
                 }
         self._memory_cache[lookup_key] = result
         self.save_data(lookup_key, result)
-        return result
+        return public_ratings(result)
 
     async def _collect(
         self, tmdb_id: int, media_type: str, title: str, year: Optional[int]
@@ -311,13 +312,6 @@ class MediaRatings(_PluginBase):
         foreign_title = original_title or resolved_title or title
         sources: Dict[str, Dict[str, Any]] = {}
 
-        tmdb_score = normalize_score(tmdb.get("vote_average"))
-        if tmdb_score is not None:
-            sources["tmdb"] = self._source(
-                "tmdb", "TMDB", tmdb_score, tmdb.get("vote_count"),
-                f"https://www.themoviedb.org/{media_type}/{tmdb_id}",
-            )
-
         tasks = [self._douban(tmdb_id, mtype)]
         is_anime = self._is_anime(tmdb)
         if is_anime:
@@ -332,18 +326,6 @@ class MediaRatings(_PluginBase):
         )
         if imdb_source:
             sources["imdb"] = imdb_source
-            metacritic_score = normalize_score(
-                imdb_source.pop("metacritic_score", None), 100
-            )
-            if metacritic_score is not None:
-                sources["metacritic"] = self._source(
-                    "metacritic",
-                    "Metacritic",
-                    metacritic_score,
-                    imdb_source.pop("metacritic_reviews", None),
-                    "https://www.metacritic.com/search/" + (resolved_title or title) + "/",
-                    display=f"{int(metacritic_score * 10)}/100",
-                )
 
         if self._omdb_api_key and imdb_id:
             try:
@@ -357,12 +339,10 @@ class MediaRatings(_PluginBase):
                     label = {
                         "imdb": "IMDb",
                         "rotten_tomatoes": "Rotten Tomatoes",
-                        "metacritic": "Metacritic",
                     }[source_id]
                     link = {
                         "imdb": f"https://www.imdb.com/title/{imdb_id}",
                         "rotten_tomatoes": "https://www.rottentomatoes.com/search?search=" + resolved_title,
-                        "metacritic": "https://www.metacritic.com/search/" + resolved_title + "/",
                     }[source_id]
                     sources[source_id] = self._source(
                         source_id, label, item["score"], item.get("votes"), link,
@@ -372,7 +352,7 @@ class MediaRatings(_PluginBase):
                 logger.warning(f"MediaRatings OMDb lookup failed for {imdb_id}: {error}")
 
         order = [
-            "tmdb", "imdb", "rotten_tomatoes", "metacritic", "douban", "bangumi"
+            "imdb", "rotten_tomatoes", "douban", "bangumi"
         ]
         return {
             "tmdb_id": tmdb_id,
@@ -408,21 +388,12 @@ class MediaRatings(_PluginBase):
         imdb_id = str(tmdb.get("imdb_id") or external_ids.get("imdb_id") or "").strip()
         imdb_matches = await self._imdb_episode_matches(imdb_id, anchors, season)
         source_rows: Dict[str, List[Dict[str, Any]]] = {
-            "tmdb": [], "imdb": []
+            "imdb": []
         }
         episodes: List[Dict[str, Any]] = []
         for anchor in anchors:
             number = int(anchor.get("episode_number") or 0)
             row_sources: List[Dict[str, Any]] = []
-            tmdb_score = normalize_score(anchor.get("vote_average"))
-            if tmdb_score is not None:
-                item = self._source(
-                    "tmdb", "TMDB", tmdb_score, anchor.get("vote_count"),
-                    f"https://www.themoviedb.org/tv/{tmdb_id}/season/{season}/episode/{number}",
-                )
-                row_sources.append(item)
-                source_rows["tmdb"].append(item)
-
             imdb = imdb_matches.get(number)
             imdb_rating = (imdb or {}).get("rating") or {}
             imdb_score = normalize_score(
@@ -449,10 +420,9 @@ class MediaRatings(_PluginBase):
 
         season_sources = []
         source_meta = {
-            "tmdb": ("TMDB", f"https://www.themoviedb.org/tv/{tmdb_id}/season/{season}"),
             "imdb": ("IMDb", f"https://www.imdb.com/title/{imdb_id}/episodes/"),
         }
-        for source_id in ("tmdb", "imdb"):
+        for source_id in ("imdb",):
             name, url = source_meta[source_id]
             aggregate = aggregate_episode_source(
                 source_id, name, source_rows[source_id], url
@@ -555,11 +525,6 @@ class MediaRatings(_PluginBase):
                 votes = self._value(rating, "vote_count", "voteCount", "votes", "count")
             source = self._source(
                 "imdb", "IMDb", score, votes, f"https://www.imdb.com/title/{imdb_id}"
-            )
-            critic = self._value(info, "critic_review", "criticReview", "metacritic")
-            source["metacritic_score"] = self._value(critic, "score")
-            source["metacritic_reviews"] = self._value(
-                critic, "review_count", "reviewCount", "count"
             )
             return source
         except Exception as error:
