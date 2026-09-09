@@ -385,7 +385,7 @@
       const season = Number(select.value)
       if (!Number.isInteger(season) || loadedSeason === season) return
       const serial = ++loadSerial
-      status.textContent = '正在匹配 IMDb 与 TMDB…'
+      status.textContent = '正在获取单集评分…'
       result.innerHTML = '<div class="mpr-loading">正在加载季与单集评分…</div>'
       try {
         const query = new URLSearchParams({ tmdb_id: payload.tmdb_id, season })
